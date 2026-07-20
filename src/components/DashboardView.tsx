@@ -42,7 +42,7 @@ export default function DashboardView() {
       try {
         const cachedP = localStorage.getItem("clinic_patients_v1");
         const pList = cachedP ? JSON.parse(cachedP) : [];
-        setPatientCount(pList.length || 128);
+        setPatientCount(pList.length);
       } catch (e) {}
 
       // 2. Today Appointments Count
@@ -50,7 +50,7 @@ export default function DashboardView() {
         const cachedA = localStorage.getItem("clinic_appointments_v1");
         const aList = cachedA ? JSON.parse(cachedA) : [];
         const todayA = aList.filter((a: any) => a.date === todayStr);
-        setTodayApptCount(todayA.length || 24);
+        setTodayApptCount(todayA.length);
       } catch (e) {}
 
       // 3. Active Queue Count & Live Queue Table
@@ -69,7 +69,7 @@ export default function DashboardView() {
         const lunasRev = bList
           .filter((b: any) => b.status === "Lunas")
           .reduce((acc: number, b: any) => acc + (b.total || 0), 0);
-        setTodayRevenue(lunasRev || 18450000);
+        setTodayRevenue(lunasRev);
       } catch (e) {}
     };
 

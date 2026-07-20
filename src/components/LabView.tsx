@@ -21,11 +21,7 @@ export interface LabTestOrder {
   notes?: string;
 }
 
-const DEFAULT_TESTS: LabTestOrder[] = [
-  { id: "LAB001", patientName: "Andi Pratama", patientRm: "RM0001234", testName: "Darah Lengkap & Hb", doctorName: "dr. Maya Lestari", date: new Date().toISOString().split("T")[0], status: "selesai", resultValue: "Hb: 14.2 g/dL, Leukosit: 7.500", normalRange: "Hb: 13-17 g/dL", notes: "Dalam batas normal" },
-  { id: "LAB002", patientName: "Dewi Sartika", patientRm: "RM0001237", testName: "Gula Darah Puasa (GDP)", doctorName: "dr. Ahmad Rizki", date: new Date().toISOString().split("T")[0], status: "proses", resultValue: "-", normalRange: "70-110 mg/dL", notes: "Sampel sedang diuji" },
-  { id: "LAB003", patientName: "Budi Santoso", patientRm: "RM0001236", testName: "Profil Lipid (Kolesterol Total)", doctorName: "dr. Maya Lestari", date: new Date().toISOString().split("T")[0], status: "menunggu", resultValue: "-", normalRange: "< 200 mg/dL", notes: "Puasa 10 jam" },
-];
+const DEFAULT_TESTS: LabTestOrder[] = [];
 
 export default function LabView() {
   const [tests, setTests] = useState<LabTestOrder[]>([]);
@@ -58,8 +54,7 @@ export default function LabView() {
       if (cached) {
         setTests(JSON.parse(cached));
       } else {
-        setTests(DEFAULT_TESTS);
-        localStorage.setItem("clinic_lab_v1", JSON.stringify(DEFAULT_TESTS));
+        setTests([]);
       }
     } catch (e) {}
 

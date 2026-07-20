@@ -49,15 +49,7 @@ const getCurrentTimeStr = () => {
   return String(d.getHours()).padStart(2, '0') + ":" + String(d.getMinutes()).padStart(2, '0');
 };
 
-const getInitialQueue = (): QueueItem[] => [
-  { id: "Q001", no: "A-011", patientId: "RM0001234", name: "Andi Pratama", phone: "0812-3456-7890", poli: "Umum", doctorName: "dr. Maya Lestari", status: "selesai", wait: "—", avatar: "AP", color: "#0d9488", date: getTodayStr(), createdTime: "08:00" },
-  { id: "Q002", no: "B-002", patientId: "RM0001237", name: "Dewi Sartika", phone: "0813-2233-4455", poli: "Gigi", doctorName: "drg. Sari Dewi", status: "selesai", wait: "—", avatar: "DS", color: "#8b5cf6", date: getTodayStr(), createdTime: "08:15" },
-  { id: "Q003", no: "A-013", patientId: "RM0001236", name: "Budi Santoso", phone: "0812-5566-7788", poli: "Umum", doctorName: "dr. Maya Lestari", status: "dipanggil", wait: "00:02", avatar: "BS", color: "#f97316", date: getTodayStr(), createdTime: "08:45" },
-  { id: "Q004", no: "C-005", patientId: "RM0001235", name: "Siti Rahayu", phone: "0812-1122-3344", poli: "Jantung", doctorName: "dr. Ahmad Rizki", status: "menunggu", wait: "05:20", avatar: "SR", color: "#ec4899", date: getTodayStr(), createdTime: "09:00" },
-  { id: "Q005", no: "A-015", patientId: "RM0001238", name: "Hendra Wijaya", phone: "0812-9988-7766", poli: "Umum", doctorName: "dr. Maya Lestari", status: "menunggu", wait: "12:45", avatar: "HW", color: "#22c55e", date: getTodayStr(), createdTime: "09:10" },
-  { id: "Q006", no: "D-004", patientId: "RM0001239", name: "Rina Kusuma", phone: "0813-4455-6677", poli: "Mata", doctorName: "dr. Hendra Kusuma", status: "menunggu", wait: "20:10", avatar: "RK", color: "#3b82f6", date: getTodayStr(), createdTime: "09:20" },
-  { id: "Q007", no: "A-017", patientId: "RM0001240", name: "Ahmad Fauzi", phone: "0811-2233-4455", poli: "Umum", doctorName: "dr. Maya Lestari", status: "menunggu", wait: "28:30", avatar: "AF", color: "#a855f7", date: getTodayStr(), createdTime: "09:30" },
-];
+const getInitialQueue = (): QueueItem[] => [];
 
 const statusBadge = (s: string) => {
   const m: Record<string, [string, string, string]> = {

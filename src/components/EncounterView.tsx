@@ -24,39 +24,35 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
   const [waitingQueueList, setWaitingQueueList] = useState<any[]>([]);
 
   const [activePatient, setActivePatient] = useState({
-    rm: "RM0001236",
-    name: "Budi Santoso",
-    gender: "Laki-laki",
-    age: 40,
+    rm: "-",
+    name: "Pilih Pasien Dari Antrean",
+    gender: "-",
+    age: 0,
     poli: "Umum",
-    queueNo: "A-013",
+    queueNo: "-",
     doctor: "dr. Maya Lestari",
-    allergies: ["Penicillin"],
-    conditions: ["Hipertensi", "Diabetes Tipe 2"]
+    allergies: [],
+    conditions: []
   });
 
   const [soap, setSoap] = useState({
-    S: "Pasien datang mengeluh pusing berputar sejak 2 hari, lemas, dan kadang mual.",
-    O: "TD: 140/90 mmHg, N: 84 x/menit, Suhu: 36.8°C, RR: 18 x/menit, SpO2: 98%, BB: 72 kg",
-    A: "Hipertensi Grade 1 (ICD-10: I10), Vertigo Benigna (ICD-10: H81.1)",
-    P: "1. Amlodipine 5mg 1x1 pagi\n2. Betahistine 6mg 3x1\n3. Paracetamol 500mg 3x1 (prn)\n4. Edukasi diet rendah garam & kontrol 1 minggu lagi."
+    S: "",
+    O: "",
+    A: "",
+    P: ""
   });
 
   const [vitals, setVitals] = useState({
-    td: "140/90",
-    nadi: "84",
-    suhu: "36.8",
-    rr: "18",
-    spo2: "98",
-    bb: "72"
+    td: "",
+    nadi: "",
+    suhu: "",
+    rr: "",
+    spo2: "",
+    bb: ""
   });
 
   // Prescriptions List
-  const [prescriptions, setPrescriptions] = useState([
-    { nama: "Amlodipine 5mg", dosis: "1x1 Pagi (Setelah Makan)", jumlah: 10, harga: 15000 },
-    { nama: "Betahistine Mesylate 6mg", dosis: "3x1 (Sesudah Makan)", jumlah: 15, harga: 25000 },
-    { nama: "Paracetamol 500mg", dosis: "3x1 (Bila Pusing/Nyeri)", jumlah: 10, harga: 10000 },
-  ]);
+  const [prescriptions, setPrescriptions] = useState<any[]>([]);
 
   // Lab Order State
   const [requestLabTest, setRequestLabTest] = useState(false);

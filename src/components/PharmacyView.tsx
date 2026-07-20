@@ -37,10 +37,7 @@ const DEFAULT_INVENTORY: InventoryItem[] = [
   { id: "MED006", name: "Betahistine Mesylate 6mg", stock: 120, min: 40, unit: "tablet", price: 1600, color: "#8b5cf6" },
 ];
 
-const DEFAULT_ORDERS: PharmacyOrder[] = [
-  { id: "RX-001", patientRm: "RM0001236", patientName: "Budi Santoso", doctorName: "dr. Maya Lestari", date: new Date().toISOString().split("T")[0], medicines: [{ nama: "Amlodipine 5mg", dosis: "1x1 Pagi", jumlah: 10, harga: 15000 }, { nama: "Betahistine 6mg", dosis: "3x1", jumlah: 15, harga: 25000 }], status: "Menunggu Penyiapan" },
-  { id: "RX-002", patientRm: "RM0001234", patientName: "Andi Pratama", doctorName: "dr. Maya Lestari", date: new Date().toISOString().split("T")[0], medicines: [{ nama: "Amoksisilin 500mg", dosis: "3x1", jumlah: 15, harga: 22500 }], status: "Siap Diambil" },
-];
+const DEFAULT_ORDERS: PharmacyOrder[] = [];
 
 export default function PharmacyView() {
   const [tab, setTab] = useState<"resep" | "stok">("resep");
@@ -64,8 +61,7 @@ export default function PharmacyView() {
       if (cachedRx) {
         setOrders(JSON.parse(cachedRx));
       } else {
-        setOrders(DEFAULT_ORDERS);
-        localStorage.setItem("clinic_pharmacy_v1", JSON.stringify(DEFAULT_ORDERS));
+        setOrders([]);
       }
     } catch (e) {}
 

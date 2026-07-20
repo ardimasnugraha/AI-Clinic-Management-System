@@ -43,29 +43,7 @@ const getTodayStr = () => {
 
 // Default seed data
 const getInitialAppointments = (): Appointment[] => {
-  const today = getTodayStr();
-  const todayObj = new Date();
-  
-  // Calculate relative dates for realistic calendar view
-  const formatDate = (offsetDays: number) => {
-    const target = new Date(todayObj);
-    target.setDate(todayObj.getDate() + offsetDays);
-    const y = target.getFullYear();
-    const m = String(target.getMonth() + 1).padStart(2, '0');
-    const d = String(target.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  };
-
-  return [
-    { id: "APT001", patientId: "RM0001234", name: "Andi Pratama", phone: "0812-3456-7890", poli: "Umum", dokter: "dr. Maya Lestari", date: today, time: "08:00", dur: 30, status: "selesai", notes: "Pemeriksaan rutin tekanan darah", col: "#0d9488", bg: "#e0f2fe" },
-    { id: "APT002", patientId: "RM0001237", name: "Dewi Sartika", phone: "0813-2233-4455", poli: "Gigi", dokter: "drg. Sari Dewi", date: today, time: "08:30", dur: 30, status: "berjalan", notes: "Pembersihan karang gigi (scaling)", col: "#8b5cf6", bg: "#ede9fe" },
-    { id: "APT003", patientId: "RM0001236", name: "Budi Santoso", phone: "0812-5566-7788", poli: "Jantung", dokter: "dr. Ahmad Rizki", date: today, time: "09:00", dur: 30, status: "menunggu", notes: "Kontrol keluhan dada sering berdebar", col: "#f97316", bg: "#fff7ed" },
-    { id: "APT004", patientId: "RM0001235", name: "Siti Rahayu", phone: "0812-1122-3344", poli: "Mata", dokter: "dr. Hendra Kusuma", date: today, time: "09:30", dur: 30, status: "menunggu", notes: "Pemeriksaan refraksi mata minus", col: "#3b82f6", bg: "#eff6ff" },
-    { id: "APT005", patientId: "RM0001238", name: "Hendra Wijaya", phone: "0812-9988-7766", poli: "Umum", dokter: "dr. Maya Lestari", date: today, time: "10:00", dur: 30, status: "menunggu", notes: "Demam dan flu sejak 2 hari", col: "#0d9488", bg: "#e0f2fe" },
-    { id: "APT006", patientId: "RM0001239", name: "Rina Kusuma", phone: "0813-4455-6677", poli: "Kulit", dokter: "dr. Laila Rahmawati", date: formatDate(-1), time: "10:30", dur: 30, status: "dibatalkan", notes: "Pasien reschedule jadwal kerja", col: "#ec4899", bg: "#fdf2f8" },
-    { id: "APT007", patientId: "RM0001240", name: "Bambang Pamungkas", phone: "0811-2233-4455", poli: "Anak", dokter: "dr. Rudi Setiawan", date: formatDate(1), time: "09:00", dur: 30, status: "menunggu", notes: "Vaksinasi imunisasi rutin anak", col: "#22c55e", bg: "#f0fdf4" },
-    { id: "APT008", patientId: "RM0001241", name: "Anita Wijaya", phone: "0815-6677-8899", poli: "Gigi", dokter: "drg. Sari Dewi", date: formatDate(1), time: "11:00", dur: 30, status: "menunggu", notes: "Konsultasi penambalan gigi berlubang", col: "#8b5cf6", bg: "#ede9fe" },
-  ];
+  return [];
 };
 
 const statusBadge = (s: string) => {

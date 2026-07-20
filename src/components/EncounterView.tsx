@@ -22,17 +22,18 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
   const [activeTab, setActiveTab] = useState("SOAP Note");
   const [doctorsList, setDoctorsList] = useState<any[]>([]);
   const [waitingQueueList, setWaitingQueueList] = useState<any[]>([]);
+  const [registeredPatientsList, setRegisteredPatientsList] = useState<any[]>([]);
 
   const [activePatient, setActivePatient] = useState({
     rm: "-",
-    name: "Pilih Pasien Dari Antrean",
+    name: "Pilih Pasien Dari Antrean / Daftar",
     gender: "-",
     age: 0,
     poli: "Umum",
     queueNo: "-",
     doctor: "dr. Maya Lestari",
-    allergies: [],
-    conditions: []
+    allergies: [] as string[],
+    conditions: [] as string[]
   });
 
   const [soap, setSoap] = useState({
@@ -58,8 +59,9 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
   const [requestLabTest, setRequestLabTest] = useState(false);
   const [labTestName, setLabTestName] = useState("Darah Lengkap & Hb");
 
-  const [newMed, setNewMed] = useState({ nama: "", dosis: "3x1 sesudah makan", jumlah: 10, harga: 12000 });
+  const [newMed, setNewMed] = useState({ nama: "Paracetamol 500mg", dosis: "3x1 sesudah makan", jumlah: 10, harga: 10000 });
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [finalResultModal, setFinalResultModal] = useState<any | null>(null);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -70,14 +72,13 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
     const docs = getStoredDoctors();
     setDoctorsList(docs);
 
-    if (initialPatient) {
-      setActivePatient(prev => ({
-        ...prev,
-        rm: initialPatient.rm,
-        name: initialPatient.name
-      }));
-      if (onClearInitialPatient) onClearInitialPatient();
-    }
+    // Load registered patients list
+    try {
+      const cachedPatients = localStorage.getItem("clinic_patients_v1");
+      if (cachedPatients) {
+        setRegisteredPatientsList(JSON.parse(cachedPatients));
+      }
+    } catch (e) {}
 
     // Load queue list for patient selection
     try {
@@ -102,20 +103,90 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
         }
       }
     } catch (e) {}
-  }, [initialPatient, onClearInitialPatient]);
 
-  const handleSelectPatientFromQueue = (rmOrName: string) => {
-    const found = waitingQueueList.find(q => (q.patientId === rmOrName || q.name === rmOrName));
-    if (found) {
+    if (initialPatient) {
       setActivePatient(prev => ({
         ...prev,
-        rm: found.patientId || `RM000${Math.floor(1000 + Math.random() * 9000)}`,
-        name: found.name,
-        poli: found.poli,
-        queueNo: found.no,
-        doctor: found.doctorName || doctorsList[0]?.name || "dr. Maya Lestari"
+        rm: initialPatient.rm,
+        name: initialPatient.name
       }));
-      showToast(`Pasien ${found.name} (${found.no}) terpilih untuk pemeriksaan.`);
+      if (onClearInitialPatient) onClearInitialPatient();
+    }
+  }, [initialPatient, onClearInitialPatient]);
+
+  const handleSelectPatientAny = (rmOrName: string) => {
+    if (!rmOrName) return;
+    const foundQueue = waitingQueueList.find(q => (q.patientId === rmOrName || q.name === rmOrName));
+    const foundPatient = registeredPatientsList.find(p => (p.rm === rmOrName || p.name === rmOrName));
+
+    if (foundQueue) {
+      setActivePatient({
+        rm: foundQueue.patientId || `RM000${Math.floor(1000 + Math.random() * 9000)}`,
+        name: foundQueue.name,
+        gender: "Laki-laki",
+        age: 35,
+        poli: foundQueue.poli,
+        queueNo: foundQueue.no,
+        doctor: foundQueue.doctorName || doctorsList[0]?.name || "dr. Maya Lestari",
+        allergies: [],
+        conditions: []
+      });
+      showToast(`Pasien Antrean ${foundQueue.name} (${foundQueue.no}) terpilih.`);
+    } else if (foundPatient) {
+      setActivePatient({
+        rm: foundPatient.rm,
+        name: foundPatient.name,
+        gender: foundPatient.gender || "Laki-laki",
+        age: foundPatient.age || 35,
+        poli: "Umum",
+        queueNo: "Direct",
+        doctor: doctorsList[0]?.name || "dr. Maya Lestari",
+        allergies: foundPatient.allergies || [],
+        conditions: foundPatient.conditions || []
+      });
+      showToast(`Pasien Terdaftar ${foundPatient.name} (${foundPatient.rm}) terpilih.`);
+    }
+  };
+
+  const applySoapTemplate = (type: "flu" | "hipertensi" | "gigi") => {
+    if (type === "flu") {
+      setSoap({
+        S: "Pasien mengeluh demam sejak 2 hari, disertai batuk berdahak, pilek, dan tenggorokan sakit.",
+        O: "TD: 110/70 mmHg, Nadi: 82 x/menit, Suhu: 38.2°C, RR: 20 x/menit, SpO2: 98%, BB: 60 kg.",
+        A: "ISPA / Infeksi Saluran Pernapasan Akut (ICD-10: J06.9)",
+        P: "1. Paracetamol 500mg 3x1 tablet (bila demam)\n2. Amoksisilin 500mg 3x1 tablet (habiskan)\n3. OBH Combi Sirup 3x1 cth\n4. Istirahat cukup & minum air hangat."
+      });
+      setVitals({ td: "110/70", nadi: "82", suhu: "38.2", rr: "20", spo2: "98", bb: "60" });
+      setPrescriptions([
+        { nama: "Paracetamol 500mg", dosis: "3x1 Tablet (Bila Demam)", jumlah: 10, harga: 10000 },
+        { nama: "Amoksisilin 500mg", dosis: "3x1 Kapsul (Sesudah Makan)", jumlah: 15, harga: 22500 },
+        { nama: "OBH Combi Sirup 100ml", dosis: "3x1 Sendok Teh", jumlah: 1, harga: 18000 }
+      ]);
+      showToast("Template SOAP Demam & Flu diterapkan!");
+    } else if (type === "hipertensi") {
+      setSoap({
+        S: "Pasien datang untuk kontrol rutin hipertensi. Mengeluh kadang tengkuk terasa berat.",
+        O: "TD: 140/90 mmHg, Nadi: 84 x/menit, Suhu: 36.6°C, RR: 18 x/menit, SpO2: 98%, BB: 70 kg.",
+        A: "Hipertensi Essential / Primer (ICD-10: I10)",
+        P: "1. Amlodipine 5mg 1x1 tablet pagi hari\n2. Edukasi diet rendah garam & olahraga teratur\n3. Kontrol ulang 2 minggu lagi."
+      });
+      setVitals({ td: "140/90", nadi: "84", suhu: "36.6", rr: "18", spo2: "98", bb: "70" });
+      setPrescriptions([
+        { nama: "Amlodipine 5mg", dosis: "1x1 Tablet Pagi (Sesudah Makan)", jumlah: 30, harga: 45000 }
+      ]);
+      showToast("Template SOAP Hipertensi diterapkan!");
+    } else if (type === "gigi") {
+      setSoap({
+        S: "Pasien mengeluh sakit gigi geraham bawah kanan sejak semalam, ngilu saat minum dingin.",
+        O: "Pemeriksaan intraoral: Karies dentis profunda pada gigi 46. Percusi (+), Palpasi (-).",
+        A: "Pulpitis Akut / Karies Gigi (ICD-10: K02.9)",
+        P: "1. Asam Mefenamat 500mg 3x1 tablet (pereda nyeri)\n2. Penambalan sementara / Pro premedikasi."
+      });
+      setVitals({ td: "120/80", nadi: "80", suhu: "36.5", rr: "18", spo2: "99", bb: "65" });
+      setPrescriptions([
+        { nama: "Asam Mefenamat 500mg", dosis: "3x1 Tablet (Sesudah Makan)", jumlah: 10, harga: 15000 }
+      ]);
+      showToast("Template SOAP Sakit Gigi diterapkan!");
     }
   };
 
@@ -125,7 +196,7 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
       return;
     }
     setPrescriptions([...prescriptions, { ...newMed }]);
-    setNewMed({ nama: "", dosis: "3x1 sesudah makan", jumlah: 10, harga: 12000 });
+    setNewMed({ nama: "Paracetamol 500mg", dosis: "3x1 sesudah makan", jumlah: 10, harga: 10000 });
     showToast("Obat berhasil ditambahkan ke resep!");
   };
 
@@ -134,16 +205,23 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
   };
 
   const handleFinalizeEncounter = () => {
+    if (!activePatient.name || activePatient.name === "Pilih Pasien Dari Antrean / Daftar") {
+      alert("Harap pilih Pasien yang diperiksa terlebih dahulu dari dropdown di atas.");
+      return;
+    }
+
     const encounterId = `ENC-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const invoiceId = `INV-${Math.floor(1000 + Math.random() * 9000)}`;
+    const rxId = `RX-${Math.floor(1000 + Math.random() * 9000)}`;
 
     // 1. Create Invoice in Billing Store
-    try {
-      const rxSubtotal = prescriptions.reduce((acc, p) => acc + (p.harga || 12000), 0);
-      const consultationFee = 50000;
-      const totalAmount = consultationFee + rxSubtotal;
+    const rxSubtotal = prescriptions.reduce((acc, p) => acc + (p.harga || 12000), 0);
+    const consultationFee = 50000;
+    const totalAmount = consultationFee + rxSubtotal;
 
+    try {
       const invoiceItem = {
-        id: `INV-${Math.floor(1000 + Math.random() * 9000)}`,
+        id: invoiceId,
         patientRm: activePatient.rm,
         patientName: activePatient.name,
         doctorName: activePatient.doctor,
@@ -168,7 +246,7 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
       const cachedRx = localStorage.getItem("clinic_pharmacy_v1");
       const rxList = cachedRx ? JSON.parse(cachedRx) : [];
       const newRxOrder = {
-        id: `RX-${Math.floor(1000 + Math.random() * 9000)}`,
+        id: rxId,
         patientRm: activePatient.rm,
         patientName: activePatient.name,
         doctorName: activePatient.doctor,
@@ -193,9 +271,17 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
     // 4. Auto-Complete Status in Queue and Appointment Store!
     completePatientEncounterSync(activePatient.rm, activePatient.name);
 
-    logAuditEvent("Finalisasi Encounter Konsultasi", "Encounter", `Encounter ${encounterId} pasien ${activePatient.name} telah difinalisasi & status antrean/appointment diupdate selesai.`);
+    logAuditEvent("Finalisasi Encounter Konsultasi", "Encounter", `Encounter ${encounterId} pasien ${activePatient.name} telah difinalisasi.`);
 
-    showToast(`✓ Encounter ${encounterId} Berhasil Difinalisasi! Antrean & Appointment pasien ${activePatient.name} diupdate SELESAI.`);
+    setFinalResultModal({
+      encounterId,
+      invoiceId,
+      rxId,
+      patientName: activePatient.name,
+      totalAmount,
+      prescriptionsCount: prescriptions.length,
+      hasLab: requestLabTest
+    });
   };
 
   return (
@@ -214,24 +300,37 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
       )}
 
       {/* Header Info */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#0f172a", margin: 0 }}>Modul Pemeriksaan Dokter (Encounter)</h1>
           <p style={{ fontSize: 13, color: "#64748b", margin: "2px 0 0" }}>Catatan medis SOAP, vital sign, diagnosis ICD-10, dan peresepan obat</p>
         </div>
 
         {/* Patient Selection Dropdown */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <label style={{ fontSize: 12, fontWeight: 800, color: "#0f172a" }}>Pilih Pasien Antrean Aktif:</label>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <label style={{ fontSize: 12, fontWeight: 800, color: "#0f172a" }}>Pilih Pasien Yang Diperiksa:</label>
           <select 
-            onChange={e => handleSelectPatientFromQueue(e.target.value)}
+            onChange={e => handleSelectPatientAny(e.target.value)}
             style={{ padding: "8.5px 14px", borderRadius: 10, border: "1.5px solid #0d9488", background: "#f0fdf4", fontSize: 12.5, fontWeight: 800, color: "#0f172a", outline: "none", cursor: "pointer" }}>
-            <option value="">-- {waitingQueueList.length} Pasien Menunggu/Dipanggil --</option>
-            {waitingQueueList.map(q => (
-              <option key={q.id} value={q.patientId || q.name}>
-                {q.no} - {q.name} (Poli {q.poli}) [{q.status}]
-              </option>
-            ))}
+            <option value="">-- Pilih Pasien Diperiksa --</option>
+            {waitingQueueList.length > 0 && (
+              <optgroup label="--- PASIEN ANTREAN POLI (AKTIF) ---">
+                {waitingQueueList.map(q => (
+                  <option key={`q-${q.id}`} value={q.patientId || q.name}>
+                    [Antrean {q.no}] {q.name} (Poli {q.poli})
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {registeredPatientsList.length > 0 && (
+              <optgroup label="--- PASIEN TERDAFTAR KLINIK ---">
+                {registeredPatientsList.map(p => (
+                  <option key={`p-${p.rm}`} value={p.rm}>
+                    [{p.rm}] {p.name} ({p.phone})
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
         </div>
       </div>
@@ -241,7 +340,7 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
         <div style={{ background: "linear-gradient(135deg, #e0f2fe, #ccfbf1)", padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{ width: 60, height: 60, borderRadius: "50%", background: "linear-gradient(135deg,#0d9488,#0ea5e9)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 900, color: "#fff", boxShadow: "0 4px 12px rgba(13,148,136,0.3)", flexShrink: 0 }}>
-              {activePatient.name.split(" ").map(w => w[0]).slice(0, 2).join("")}
+              {activePatient.name ? activePatient.name.split(" ").map(w => w[0]).slice(0, 2).join("") : "P"}
             </div>
             <div>
               <h2 style={{ fontSize: 19, fontWeight: 800, color: "#0f172a", margin: 0 }}>{activePatient.name}</h2>
@@ -307,12 +406,28 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
           {/* TAB: SOAP NOTE */}
           {activeTab === "SOAP Note" && (
             <Container style={{ padding: 24 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
                 <h3 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", margin: 0 }}>Catatan SOAP (Subjective, Objective, Assessment, Plan)</h3>
-                <button 
-                  onClick={() => showToast("Draft SOAP berhasil disimpan.")}
-                  style={{ display: "flex", alignItems: "center", gap: 6, background: "#0d9488", color: "#fff", border: "none", borderRadius: 10, padding: "8px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                  <Save style={{ width: 14, height: 14 }} /> Simpan Draft
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button 
+                    onClick={() => showToast("Draft SOAP berhasil disimpan.")}
+                    style={{ display: "flex", alignItems: "center", gap: 6, background: "#0d9488", color: "#fff", border: "none", borderRadius: 10, padding: "8px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                    <Save style={{ width: 14, height: 14 }} /> Simpan Draft
+                  </button>
+                </div>
+              </div>
+
+              {/* Template Buttons */}
+              <div style={{ background: "#f8fafc", padding: "12px 16px", borderRadius: 12, border: "1px solid #e2e8f0", marginBottom: 20, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 11.5, fontWeight: 800, color: "#475569" }}>⚡ Quick Template SOAP:</span>
+                <button onClick={() => applySoapTemplate("flu")} style={{ background: "#e0f2fe", color: "#0369a1", border: "1px solid #bae6fd", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  + Demam & Flu
+                </button>
+                <button onClick={() => applySoapTemplate("hipertensi")} style={{ background: "#fff7ed", color: "#c2410c", border: "1px solid #ffedd5", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  + Kontrol Hipertensi
+                </button>
+                <button onClick={() => applySoapTemplate("gigi")} style={{ background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  + Sakit Gigi
                 </button>
               </div>
 
@@ -533,6 +648,49 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
           </Container>
         </div>
       </div>
+
+      {/* Finalization Result Modal */}
+      {finalResultModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 480, padding: 28, boxShadow: "0 20px 40px rgba(0,0,0,0.25)", textAlign: "center" }}>
+            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#dcfce7", color: "#15803d", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+              <CheckCircle2 style={{ width: 36, height: 36 }} />
+            </div>
+
+            <h3 style={{ fontSize: 20, fontWeight: 900, color: "#0f172a", margin: "0 0 6px" }}>Pemeriksaan Berhasil Difinalisasi!</h3>
+            <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 20px", lineHeight: 1.5 }}>
+              Rekam medis pasien <strong>{finalResultModal.patientName}</strong> telah disimpan & status antrean/appointment diperbarui menjadi <strong>SELESAI</strong>.
+            </p>
+
+            <div style={{ background: "#f8fafc", padding: 16, borderRadius: 14, border: "1px solid #e2e8f0", textAlign: "left", marginBottom: 20, display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
+                <span style={{ color: "#64748b", fontWeight: 600 }}>ID Encounter:</span>
+                <span style={{ fontWeight: 800, color: "#0f172a" }}>{finalResultModal.encounterId}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
+                <span style={{ color: "#64748b", fontWeight: 600 }}>Invoice Tagihan (Billing):</span>
+                <span style={{ fontWeight: 800, color: "#0d9488" }}>{finalResultModal.invoiceId} (Rp {finalResultModal.totalAmount.toLocaleString("id-ID")})</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
+                <span style={{ color: "#64748b", fontWeight: 600 }}>Order Resep Obat (Farmasi):</span>
+                <span style={{ fontWeight: 800, color: "#8b5cf6" }}>{finalResultModal.rxId} ({finalResultModal.prescriptionsCount} obat)</span>
+              </div>
+              {finalResultModal.hasLab && (
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
+                  <span style={{ color: "#64748b", fontWeight: 600 }}>Order Laboratorium:</span>
+                  <span style={{ fontWeight: 800, color: "#06b6d4" }}>Terikirim Ke Lab</span>
+                </div>
+              )}
+            </div>
+
+            <button 
+              onClick={() => setFinalResultModal(null)}
+              style={{ width: "100%", padding: "12px 0", borderRadius: 12, border: "none", background: "linear-gradient(135deg, #0d9488, #0ea5e9)", color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 14px rgba(13,148,136,0.3)" }}>
+              Selesai & Kembali Ke Pemeriksaan
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

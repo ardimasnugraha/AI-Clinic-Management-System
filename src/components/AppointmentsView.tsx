@@ -154,9 +154,7 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
       try {
         const localPatients = localStorage.getItem("clinic_patients_v1");
         if (localPatients) {
-          const parsed = JSON.parse(localPatients);
-          const realPatients = parsed.filter((p: any) => !p.rm?.startsWith("RM000123"));
-          setRegisteredPatients(realPatients);
+          setRegisteredPatients(JSON.parse(localPatients));
         } else {
           setRegisteredPatients([]);
         }
@@ -164,14 +162,12 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
         console.error("Failed loading patients", e);
       }
 
-      // Check LocalStorage cache and filter out old dummy items
+      // Check LocalStorage cache
       const cached = localStorage.getItem("clinic_appointments_v1");
       if (cached) {
         try {
           const parsed: Appointment[] = JSON.parse(cached);
-          const realAppts = parsed.filter(a => !a.id?.startsWith("APT00") && !a.patientId?.startsWith("RM000123"));
-          setAppointments(realAppts);
-          localStorage.setItem("clinic_appointments_v1", JSON.stringify(realAppts));
+          setAppointments(parsed);
           setIsLoading(false);
           return;
         } catch (e) {
@@ -186,13 +182,13 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
           if (!error && data && data.length > 0) {
             const mapped: Appointment[] = data.map((item: any) => ({
               id: item.id || `APT${Math.floor(100+Math.random()*900)}`,
-              patientId: item.patient_id,
+              patientId: item.patient_id || item.patient_rm,
               name: item.patient_name || item.name || "Pasien",
-              phone: item.phone || "-",
+              phone: item.phone || item.patient_phone || "-",
               poli: item.poli || "Umum",
-              dokter: item.doctor_name || "dr. Maya Lestari",
-              date: item.scheduled_time ? item.scheduled_time.split("T")[0] : getTodayStr(),
-              time: item.scheduled_time ? item.scheduled_time.split("T")[1]?.slice(0, 5) || "09:00" : "09:00",
+              dokter: item.doctor_name || item.dokter || "dr. Maya Lestari",
+              date: item.date || (item.scheduled_time ? item.scheduled_time.split("T")[0] : getTodayStr()),
+              time: item.time || (item.scheduled_time ? item.scheduled_time.split("T")[1]?.slice(0, 5) : "09:00"),
               dur: 30,
               status: (item.status?.toLowerCase() as any) || "menunggu",
               notes: item.notes || ""
@@ -208,7 +204,6 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
       }
 
       setAppointments([]);
-      localStorage.setItem("clinic_appointments_v1", JSON.stringify([]));
       setIsLoading(false);
     };
 
@@ -216,12 +211,35 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
   }, []);
 
   // Save changes to localStorage & DB helper
-  const saveAppointments = (updated: Appointment[]) => {
+  const saveAppointments = async (updated: Appointment[]) => {
     setAppointments(updated);
     try {
       localStorage.setItem("clinic_appointments_v1", JSON.stringify(updated));
     } catch (e) {
       console.error("Failed saving to localStorage", e);
+    }
+
+    // Sync to Supabase if configured
+    if (isConfigured && supabase) {
+      try {
+        const latest = updated[0];
+        if (latest) {
+          await supabase.from("appointments").upsert({
+            id: latest.id,
+            patient_rm: latest.patientId || "",
+            patient_name: latest.name,
+            patient_phone: latest.phone,
+            doctor_name: latest.dokter,
+            poli: latest.poli,
+            date: latest.date,
+            time: latest.time,
+            status: latest.status,
+            notes: latest.notes
+          });
+        }
+      } catch (err) {
+        console.warn("Supabase upsert appt notice:", err);
+      }
     }
   };
 

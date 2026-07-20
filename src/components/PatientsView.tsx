@@ -39,6 +39,17 @@ export default function PatientsView({ onMakeAppointment, onStartEncounter }: Pa
   const [editingRm, setEditingRm] = useState<string | null>(null);
 
   useEffect(() => {
+    // 1. Try loading from localStorage first
+    try {
+      const cached = localStorage.getItem("clinic_patients_v1");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        setPatients(parsed);
+        if (parsed.length > 0) setSelectedRm(parsed[0].rm);
+      }
+    } catch (e) {}
+
+    // 2. Try fetching from Supabase if configured
     const client = supabase;
     if (isConfigured && client) {
       const fetchPatients = async () => {
@@ -56,28 +67,29 @@ export default function PatientsView({ onMakeAppointment, onStartEncounter }: Pa
           const mapped: Patient[] = data.map(item => {
             const mappedStatus = item.status === "active" ? "Aktif" : item.status === "VIP" ? "VIP" : "Perlu Verifikasi";
             return {
-              rm: item.medical_record_number,
-              name: item.full_name,
+              rm: item.medical_record_number || item.rm,
+              name: item.full_name || item.name,
               nik: item.nik || "-",
-              dob: formatDateString(item.date_of_birth),
-              gender: item.sex_at_birth,
+              dob: formatDateString(item.date_of_birth || item.dob),
+              gender: item.sex_at_birth || item.gender || "Laki-laki",
               phone: item.phone || "-",
               status: mappedStatus,
               religion: item.religion || "Islam",
-              age: calculateAge(item.date_of_birth),
-              insurance: "Umum",
-              insuranceNo: "-",
+              age: calculateAge(item.date_of_birth || item.dob),
+              insurance: item.insurance || "Umum",
+              insuranceNo: item.insurance_no || "-",
               emergencyContact: {
                 name: "-",
                 relation: "-",
                 phone: "-",
                 address: "-"
               },
-              allergies: [],
-              conditions: []
+              allergies: item.allergies || [],
+              conditions: item.conditions || []
             };
           });
           setPatients(mapped);
+          localStorage.setItem("clinic_patients_v1", JSON.stringify(mapped));
           if (mapped.length > 0) {
             setSelectedRm(mapped[0].rm);
           }
@@ -470,7 +482,9 @@ export default function PatientsView({ onMakeAppointment, onStartEncounter }: Pa
       conditions: []
     };
 
-    setPatients([newPatient, ...patients]);
+    const updatedList = [newPatient, ...patients];
+    setPatients(updatedList);
+    try { localStorage.setItem("clinic_patients_v1", JSON.stringify(updatedList)); } catch (e) {}
     setSelectedRm(nextRm);
     addActivity(`Mendaftarkan pasien baru ${formName} (${nextRm})`);
     // Clear form

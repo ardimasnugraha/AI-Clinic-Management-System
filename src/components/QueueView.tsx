@@ -166,8 +166,7 @@ export default function QueueView() {
       try {
         const localPatients = localStorage.getItem("clinic_patients_v1");
         if (localPatients) {
-          const parsed = JSON.parse(localPatients);
-          setRegisteredPatients(parsed.filter((p: any) => !p.rm?.startsWith("RM000123")));
+          setRegisteredPatients(JSON.parse(localPatients));
         } else {
           setRegisteredPatients([]);
         }
@@ -180,10 +179,8 @@ export default function QueueView() {
       if (cached) {
         try {
           const parsed: QueueItem[] = JSON.parse(cached);
-          const realQueue = parsed.filter(q => !q.id?.startsWith("Q00") && !q.patientId?.startsWith("RM000123"));
-          setQueueList(realQueue);
-          localStorage.setItem("clinic_queue_v1", JSON.stringify(realQueue));
-          const activeCalled = realQueue.find((q: QueueItem) => q.status === "dipanggil");
+          setQueueList(parsed);
+          const activeCalled = parsed.find((q: QueueItem) => q.status === "dipanggil");
           if (activeCalled) {
             setCurrentNo(activeCalled.no);
           } else {
@@ -196,7 +193,6 @@ export default function QueueView() {
       }
 
       setQueueList([]);
-      localStorage.setItem("clinic_queue_v1", JSON.stringify([]));
       setCurrentNo("-");
     };
 

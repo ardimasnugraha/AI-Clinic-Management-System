@@ -154,25 +154,24 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
       try {
         const localPatients = localStorage.getItem("clinic_patients_v1");
         if (localPatients) {
-          setRegisteredPatients(JSON.parse(localPatients));
+          const parsed = JSON.parse(localPatients);
+          const realPatients = parsed.filter((p: any) => !p.rm?.startsWith("RM000123"));
+          setRegisteredPatients(realPatients);
         } else {
-          setRegisteredPatients([
-            { rm: "RM0001234", name: "Andi Pratama", phone: "0812-3456-7890" },
-            { rm: "RM0001235", name: "Siti Nurhaliza", phone: "0812-1122-3344" },
-            { rm: "RM0001236", name: "Budi Santoso", phone: "0812-5566-7788" },
-            { rm: "RM0001237", name: "Dewi Sartika", phone: "0813-2233-4455" },
-            { rm: "RM0001238", name: "Hendra Wijaya", phone: "0812-9988-7766" },
-          ]);
+          setRegisteredPatients([]);
         }
       } catch (e) {
         console.error("Failed loading patients", e);
       }
 
-      // Check LocalStorage cache
+      // Check LocalStorage cache and filter out old dummy items
       const cached = localStorage.getItem("clinic_appointments_v1");
       if (cached) {
         try {
-          setAppointments(JSON.parse(cached));
+          const parsed: Appointment[] = JSON.parse(cached);
+          const realAppts = parsed.filter(a => !a.id?.startsWith("APT00") && !a.patientId?.startsWith("RM000123"));
+          setAppointments(realAppts);
+          localStorage.setItem("clinic_appointments_v1", JSON.stringify(realAppts));
           setIsLoading(false);
           return;
         } catch (e) {
@@ -204,14 +203,12 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
             return;
           }
         } catch (err) {
-          console.warn("Supabase fetch failed, using default initial state", err);
+          console.warn("Supabase fetch failed", err);
         }
       }
 
-      // Default Seed
-      const initial = getInitialAppointments();
-      setAppointments(initial);
-      localStorage.setItem("clinic_appointments_v1", JSON.stringify(initial));
+      setAppointments([]);
+      localStorage.setItem("clinic_appointments_v1", JSON.stringify([]));
       setIsLoading(false);
     };
 

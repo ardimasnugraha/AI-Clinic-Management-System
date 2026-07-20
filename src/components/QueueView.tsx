@@ -139,7 +139,7 @@ export default function QueueView() {
   const [selFilter, setSelFilter] = useState("Semua");
   const [selPoliFilter, setSelPoliFilter] = useState("Semua");
   const [search, setSearch] = useState("");
-  const [currentNo, setCurrentNo] = useState("A-013");
+  const [currentNo, setCurrentNo] = useState("-");
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   // Modals
@@ -166,15 +166,10 @@ export default function QueueView() {
       try {
         const localPatients = localStorage.getItem("clinic_patients_v1");
         if (localPatients) {
-          setRegisteredPatients(JSON.parse(localPatients));
+          const parsed = JSON.parse(localPatients);
+          setRegisteredPatients(parsed.filter((p: any) => !p.rm?.startsWith("RM000123")));
         } else {
-          setRegisteredPatients([
-            { rm: "RM0001234", name: "Andi Pratama", phone: "0812-3456-7890" },
-            { rm: "RM0001235", name: "Siti Nurhaliza", phone: "0812-1122-3344" },
-            { rm: "RM0001236", name: "Budi Santoso", phone: "0812-5566-7788" },
-            { rm: "RM0001237", name: "Dewi Sartika", phone: "0813-2233-4455" },
-            { rm: "RM0001238", name: "Hendra Wijaya", phone: "0812-9988-7766" },
-          ]);
+          setRegisteredPatients([]);
         }
       } catch (e) {
         console.error("Error loading patients", e);
@@ -184,24 +179,25 @@ export default function QueueView() {
       const cached = localStorage.getItem("clinic_queue_v1");
       if (cached) {
         try {
-          const parsed = JSON.parse(cached);
-          if (parsed && parsed.length > 0) {
-            setQueueList(parsed);
-            const activeCalled = parsed.find((q: QueueItem) => q.status === "dipanggil");
-            if (activeCalled) {
-              setCurrentNo(activeCalled.no);
-            }
-            return;
+          const parsed: QueueItem[] = JSON.parse(cached);
+          const realQueue = parsed.filter(q => !q.id?.startsWith("Q00") && !q.patientId?.startsWith("RM000123"));
+          setQueueList(realQueue);
+          localStorage.setItem("clinic_queue_v1", JSON.stringify(realQueue));
+          const activeCalled = realQueue.find((q: QueueItem) => q.status === "dipanggil");
+          if (activeCalled) {
+            setCurrentNo(activeCalled.no);
+          } else {
+            setCurrentNo("-");
           }
+          return;
         } catch (e) {
           console.error("Failed parsing cached queue", e);
         }
       }
 
-      // Default Seed
-      const initial = getInitialQueue();
-      setQueueList(initial);
-      localStorage.setItem("clinic_queue_v1", JSON.stringify(initial));
+      setQueueList([]);
+      localStorage.setItem("clinic_queue_v1", JSON.stringify([]));
+      setCurrentNo("-");
     };
 
     loadQueue();

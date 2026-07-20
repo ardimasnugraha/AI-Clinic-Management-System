@@ -6,7 +6,7 @@ import {
   FlaskConical, Pill, Receipt, FileText, 
   Sparkles, ShieldCheck, Settings, Search, 
   Bell, ChevronDown, Building2,
-  LogOut, Clock, Menu, X, MessageSquare
+  LogOut, Clock, Menu, X, MessageSquare, User
 } from "lucide-react";
 
 import DashboardView from "@/components/DashboardView";
@@ -44,10 +44,29 @@ const menuItems = [
 export default function MainPage() {
   const [activeTab, setActiveTab] = useState<Tab>("Dashboard");
   const [showDocMenu, setShowDocMenu] = useState(false);
+  const [showBranchMenu, setShowBranchMenu] = useState(false);
+  const [showDoctorModal, setShowDoctorModal] = useState(false);
+  const [selectedBranch, setSelectedBranch] = useState("Klinik Sehat Sentosa - Cabang Semarang");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [prefilledPatientForAppt, setPrefilledPatientForAppt] = useState<{ rm: string; name: string; phone: string } | null>(null);
-
   const [prefilledPatientForEncounter, setPrefilledPatientForEncounter] = useState<null | { rm: string; name: string }>(null);
+
+  // Global Search State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
+
+  const branches = [
+    "Klinik Sehat Sentosa - Cabang Semarang (Utama)",
+    "Klinik Sehat Sentosa - Cabang Jakarta Selatan",
+    "Klinik Sehat Sentosa - Cabang Surabaya Pusat",
+    "Klinik Sehat Sentosa - Cabang Bandung Kota"
+  ];
 
   const handleStartEncounter = (patient: { rm: string; name: string }) => {
     setActiveTab("Encounter");
@@ -59,8 +78,24 @@ export default function MainPage() {
     setActiveTab("Appointment");
   };
 
+  // Search matches
+  const matchedMenus = searchQuery.trim() 
+    ? menuItems.filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : [];
+
   return (
     <div style={{ display:"flex", minHeight:"100vh", background:"#faf6f3", fontFamily:"Inter,system-ui,sans-serif" }}>
+
+      {toastMsg && (
+        <div style={{ 
+          position: "fixed", top: 20, right: 20, zIndex: 1000, 
+          background: "#0f172a", color: "#fff", padding: "10px 18px", 
+          borderRadius: 12, boxShadow: "0 8px 20px rgba(0,0,0,0.2)", 
+          fontSize: 12.5, fontWeight: 700 
+        }}>
+          {toastMsg}
+        </div>
+      )}
 
       {isSidebarOpen && (
         <div onClick={() => setIsSidebarOpen(false)}
@@ -80,7 +115,6 @@ export default function MainPage() {
         <div style={{ padding:"24px 20px 16px", borderBottom:"1px solid #fdf8f5", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <div style={{ position:"relative", flexShrink:0 }}>
-              {/* Medical Heart Logo SVG */}
               <svg width="34" height="34" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#ff5a50" />
                 <path d="M12 3.82c-1.09-1.28-2.76-2.09-4.5-2.09C4.42 1.73 2 7.23 2 7.23c0 3.78 3.4 6.86 8.55 11.54L12 20.08V3.82z" fill="#0ea5e9" />
@@ -136,7 +170,6 @@ export default function MainPage() {
               Dapatkan insight, ringkasan pasien, dan rekomendasi klinik secara instan.
             </p>
             
-            {/* Female Doctor Cartoon Illustration SVG */}
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
               <button onClick={() => setActiveTab("AI Assistant")}
                 style={{
@@ -149,7 +182,6 @@ export default function MainPage() {
               
               <div style={{ position:"absolute", right:4, bottom:-2, width:64, height:72, zIndex:1 }}>
                 <svg width="100%" height="100%" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  {/* Doctor cartoon illustration */}
                   <path d="M20 70c0-12 12-16 28-16s28 4 28 16v20H20V70z" fill="#2d6a4f" />
                   <path d="M41 54l7 14 7-14h-14z" fill="#fff" />
                   <circle cx="48" cy="38" r="15" fill="#ffd166" />
@@ -172,53 +204,97 @@ export default function MainPage() {
         <header style={{ height:70, background:"#fff", borderBottom:"1px solid #f3e8e2", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 28px", flexShrink:0, position:"sticky", top:0, zIndex:20 }}>
           
           {/* Clinic Selector Dropdown */}
-          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:12, position: "relative" }}>
             <button onClick={() => setIsSidebarOpen(true)} className="md:hidden"
               style={{ padding:8, borderRadius:12, background:"#fcf8f5", border:"1px solid #f3e8e2", cursor:"pointer", display:"flex", alignItems:"center" }}>
               <Menu style={{ width:18, height:18, color:"#64748b" }} />
             </button>
-            <div style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 16px", borderRadius:16, border:"1px solid #f3e8e2", background:"#fff" }}>
-              <div style={{ width:24, height:24, borderRadius:8, background:"#eff6ff", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                <Building2 style={{ width:14, height:14, color:"#3b82f6" }} />
-              </div>
-              <button style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", fontSize:12.5, fontWeight:700, color:"#0f172a" }}>
-                Klinik Sehat Sentosa - Cabang Semarang
+            
+            <div style={{ position: "relative" }}>
+              <button 
+                onClick={() => setShowBranchMenu(!showBranchMenu)}
+                style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 16px", borderRadius:16, border:"1px solid #f3e8e2", background:"#fff", cursor: "pointer" }}>
+                <div style={{ width:24, height:24, borderRadius:8, background:"#eff6ff", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <Building2 style={{ width:14, height:14, color:"#3b82f6" }} />
+                </div>
+                <span style={{ fontSize:12.5, fontWeight:750, color:"#0f172a" }}>
+                  {selectedBranch}
+                </span>
                 <ChevronDown style={{ width:14, height:14, color:"#94a3b8" }} />
               </button>
+
+              {showBranchMenu && (
+                <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, width: 310, background: "#fff", border: "1px solid #f3e8e2", borderRadius: 16, boxShadow: "0 10px 25px rgba(0,0,0,0.12)", padding: 8, zIndex: 100 }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#94a3b8", padding: "6px 12px", textTransform: "uppercase" }}>Pilih Cabang Klinik</div>
+                  {branches.map(b => (
+                    <button 
+                      key={b}
+                      onClick={() => {
+                        setSelectedBranch(b.replace(" (Utama)", ""));
+                        setShowBranchMenu(false);
+                        showToast(`Berhasil berpindah ke ${b}`);
+                      }}
+                      style={{
+                        width: "100%", textAlign: "left", padding: "9px 12px", borderRadius: 10, border: "none",
+                        background: selectedBranch === b.replace(" (Utama)", "") ? "#e0f2fe" : "none",
+                        color: selectedBranch === b.replace(" (Utama)", "") ? "#0369a1" : "#334155",
+                        fontSize: 12, fontWeight: 700, cursor: "pointer"
+                      }}>
+                      🏥 {b}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
           {/* Search bar */}
           <div style={{ position:"relative", flex:1, maxWidth:420, margin:"0 24px", display:"none" }} className="md:block">
             <Search style={{ position:"absolute", left:16, top:"50%", transform:"translateY(-50%)", width:16, height:16, color:"#94a3b8" }} />
-            <input type="text" placeholder="Cari pasien, appointment, atau menu..."
+            <input 
+              type="text" 
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
+              placeholder="Cari modul, pasien, atau menu..."
               style={{
                 width:"100%", paddingLeft:42, paddingRight:16, paddingTop:10, paddingBottom:10,
                 borderRadius:24, border:"1.5px solid #f3e8e2", background:"#f6eeea",
                 fontSize:12.5, color:"#1e293b", fontFamily:"inherit", outline:"none"
-              }} />
+              }} 
+            />
+
+            {/* Live Search Results Dropdown */}
+            {searchFocused && matchedMenus.length > 0 && (
+              <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, background: "#fff", border: "1px solid #f3e8e2", borderRadius: 16, boxShadow: "0 10px 25px rgba(0,0,0,0.12)", padding: 8, zIndex: 100 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: "#94a3b8", padding: "6px 12px" }}>Hasil Pencarian Modul</div>
+                {matchedMenus.map(m => {
+                  const Icon = m.icon;
+                  return (
+                    <button 
+                      key={m.name}
+                      onClick={() => {
+                        setActiveTab(m.name as Tab);
+                        setSearchQuery("");
+                      }}
+                      style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 10, border: "none", background: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 700, color: "#0f172a", textAlign: "left" }}>
+                      <Icon style={{ width: 16, height: 16, color: m.color }} />
+                      <span>Buka Modul {m.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {/* Notification & User Profile dropdown */}
+          {/* User Profile dropdown (Notification badges removed) */}
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            {/* Bell Icon */}
-            <button style={{ position:"relative", padding:9, borderRadius:12, background:"#fff", border:"1px solid #f3e8e2", cursor:"pointer", display:"flex", alignItems:"center" }}>
-              <Bell style={{ width:17, height:17, color:"#64748b" }} />
-              <span style={{ position:"absolute", top:-3, right:-3, width:16, height:16, borderRadius:"50%", background:"#ff5a50", color:"#fff", fontSize:9, fontWeight:900, display:"flex", alignItems:"center", justifyContent:"center" }}>3</span>
-            </button>
-            
-            {/* Message Icon */}
-            <button style={{ position:"relative", padding:9, borderRadius:12, background:"#fff", border:"1px solid #f3e8e2", cursor:"pointer", display:"flex", alignItems:"center" }}>
-              <MessageSquare style={{ width:17, height:17, color:"#64748b" }} />
-              <span style={{ position:"absolute", top:-3, right:-3, width:16, height:16, borderRadius:"50%", background:"#ff5a50", color:"#fff", fontSize:9, fontWeight:900, display:"flex", alignItems:"center", justifyContent:"center" }}>2</span>
-            </button>
-
             {/* Profile */}
             <div style={{ position:"relative" }}>
               <button onClick={() => setShowDocMenu(!showDocMenu)}
                 style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 12px 6px 6px", borderRadius:16, background:"#fff", border:"1px solid #f3e8e2", cursor:"pointer" }}>
                 <div style={{ width:32, height:32, borderRadius:"50%", background:"#eff6ff", display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden" }}>
-                  {/* Doctor cartoon head SVG */}
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="12" cy="12" r="10" fill="#ccfbf1" />
                     <circle cx="12" cy="10" r="4" fill="#0ea5e9" />
@@ -233,10 +309,10 @@ export default function MainPage() {
               </button>
               {showDocMenu && (
                 <div style={{ position:"absolute", right:0, top:"calc(100% + 8px)", width:192, background:"#fff", border:"1px solid #f3e8e2", borderRadius:16, boxShadow:"0 8px 24px rgba(243,232,226,0.3)", padding:8, zIndex:50 }}>
-                  <button style={{ width:"100%", textAlign:"left", padding:"8px 10px", borderRadius:10, border:"none", background:"none", cursor:"pointer", fontSize:12, fontWeight:600, color:"#334155" }}>Profil Dokter</button>
-                  <button style={{ width:"100%", textAlign:"left", padding:"8px 10px", borderRadius:10, border:"none", background:"none", cursor:"pointer", fontSize:12, fontWeight:600, color:"#334155" }}>Pengaturan Akun</button>
+                  <button onClick={() => { setShowDocMenu(false); setShowDoctorModal(true); }} style={{ width:"100%", textAlign:"left", padding:"8px 10px", borderRadius:10, border:"none", background:"none", cursor:"pointer", fontSize:12, fontWeight:600, color:"#334155" }}>Profil Dokter</button>
+                  <button onClick={() => { setShowDocMenu(false); setActiveTab("Pengaturan"); }} style={{ width:"100%", textAlign:"left", padding:"8px 10px", borderRadius:10, border:"none", background:"none", cursor:"pointer", fontSize:12, fontWeight:600, color:"#334155" }}>Pengaturan Akun</button>
                   <div style={{ height:1, background:"#f3e8e2", margin:"4px 0" }} />
-                  <button onClick={() => { setShowDocMenu(false); alert("Keluar dari sesi."); }}
+                  <button onClick={() => { setShowDocMenu(false); if (confirm("Apakah Anda yakin ingin keluar dari sesi sistem?")) alert("Anda telah keluar."); }}
                     style={{ width:"100%", textAlign:"left", padding:"8px 10px", borderRadius:10, border:"none", background:"none", cursor:"pointer", fontSize:12, fontWeight:600, color:"#dc2626", display:"flex", alignItems:"center", gap:6 }}>
                     <LogOut style={{ width:14, height:14 }} /> Keluar
                   </button>
@@ -245,6 +321,42 @@ export default function MainPage() {
             </div>
           </div>
         </header>
+
+        {/* Doctor Profile Modal */}
+        {showDoctorModal && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+            <div style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 420, padding: 24, boxShadow: "0 20px 40px rgba(0,0,0,0.2)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", margin: 0 }}>Profil Dokter Pemeriksa</h3>
+                <button onClick={() => setShowDoctorModal(false)} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 16 }}>✕</button>
+              </div>
+
+              <div style={{ textAlign: "center", marginBottom: 20 }}>
+                <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#ccfbf1", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}>
+                  <User style={{ width: 32, height: 32, color: "#0d9488" }} />
+                </div>
+                <h4 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", margin: 0 }}>dr. Maya Lestari</h4>
+                <p style={{ fontSize: 12, color: "#64748b", margin: "2px 0 0" }}>Dokter Spesialis Penyakit Dalam (Sp.PD)</p>
+                <span style={{ display: "inline-block", background: "#dcfce7", color: "#166534", padding: "3px 12px", borderRadius: 12, fontSize: 11, fontWeight: 800, marginTop: 8 }}>
+                  Status: Praktik Aktif
+                </span>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: 14, borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12, color: "#475569", display: "flex", flexDirection: "column", gap: 8 }}>
+                <div><strong>No. SIP:</strong> SIP-5542/DINKES/2024</div>
+                <div><strong>No. STR:</strong> 3374.8812.2023</div>
+                <div><strong>Poli Klinik:</strong> Poli Umum & Penyakit Dalam</div>
+                <div><strong>Jadwal Praktik:</strong> Senin - Sabtu (08:00 - 16:00)</div>
+              </div>
+
+              <button 
+                onClick={() => setShowDoctorModal(false)}
+                style={{ width: "100%", marginTop: 20, padding: 10, borderRadius: 10, border: "none", background: "#0d9488", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                Tutup Profil
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* WORKSPACE */}
         <main style={{ flex:1, overflowY:"auto", padding:"24px 28px 40px" }}>

@@ -1,0 +1,282 @@
+"use client";
+
+import React, { useState } from "react";
+import { 
+  LayoutDashboard, Users, Calendar, Activity, 
+  FlaskConical, Pill, Receipt, FileText, 
+  Sparkles, ShieldCheck, Settings, Search, 
+  Bell, ChevronDown, Building2,
+  LogOut, Clock, Menu, X, MessageSquare
+} from "lucide-react";
+
+import DashboardView from "@/components/DashboardView";
+import PatientsView from "@/components/PatientsView";
+import AppointmentsView from "@/components/AppointmentsView";
+import EncounterView from "@/components/EncounterView";
+import LabView from "@/components/LabView";
+import PharmacyView from "@/components/PharmacyView";
+import BillingView from "@/components/BillingView";
+import DocumentsView from "@/components/DocumentsView";
+import AuditLogView from "@/components/AuditLogView";
+import SettingsView from "@/components/SettingsView";
+import QueueView from "@/components/QueueView";
+
+type Tab = 
+  | "Dashboard" | "Pasien" | "Appointment" | "Antrean" | "Encounter"
+  | "Laboratorium" | "Farmasi" | "Billing" | "Dokumen" | "AI Assistant"
+  | "Audit Log" | "Pengaturan";
+
+const menuItems = [
+  { name: "Dashboard",    icon: LayoutDashboard, color: "#ff5a50" },
+  { name: "Pasien",       icon: Users,           color: "#8b5cf6" },
+  { name: "Appointment",  icon: Calendar,        color: "#3b82f6" },
+  { name: "Antrean",      icon: Clock,           color: "#0d9488" },
+  { name: "Encounter",    icon: Activity,        color: "#ec4899" },
+  { name: "Laboratorium", icon: FlaskConical,    color: "#06b6d4" },
+  { name: "Farmasi",      icon: Pill,            color: "#10b981" },
+  { name: "Billing",      icon: Receipt,         color: "#f59e0b" },
+  { name: "Dokumen",      icon: FileText,        color: "#6366f1" },
+  { name: "AI Assistant", icon: Sparkles,        color: "#a855f7" },
+  { name: "Audit Log",    icon: ShieldCheck,     color: "#0ea5e9" },
+  { name: "Pengaturan",   icon: Settings,        color: "#6b7280" },
+];
+
+export default function MainPage() {
+  const [activeTab, setActiveTab] = useState<Tab>("Dashboard");
+  const [showDocMenu, setShowDocMenu] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [prefilledPatientForAppt, setPrefilledPatientForAppt] = useState<{ rm: string; name: string; phone: string } | null>(null);
+
+  const [prefilledPatientForEncounter, setPrefilledPatientForEncounter] = useState<null | { rm: string; name: string }>(null);
+
+  const handleStartEncounter = (patient: { rm: string; name: string }) => {
+    setActiveTab("Encounter");
+    setPrefilledPatientForEncounter(patient);
+  };
+
+  const handleMakeAppointmentForPatient = (patient: { rm: string; name: string; phone: string }) => {
+    setPrefilledPatientForAppt(patient);
+    setActiveTab("Appointment");
+  };
+
+  return (
+    <div style={{ display:"flex", minHeight:"100vh", background:"#faf6f3", fontFamily:"Inter,system-ui,sans-serif" }}>
+
+      {isSidebarOpen && (
+        <div onClick={() => setIsSidebarOpen(false)}
+          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.3)", zIndex:30 }}
+          className="md:hidden" />
+      )}
+
+      {/* SIDEBAR */}
+      <aside style={{
+        width: 230, background:"#fffcfb", borderRight:"1px solid #f3e8e2",
+        boxShadow:"2px 0 12px rgba(243,232,226,0.3)", display:"flex", flexDirection:"column",
+        position:"fixed", top:0, bottom:0, left:0, zIndex:40,
+        transition:"transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+      }} className={`md:static ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
+
+        {/* Logo (Heart with Medical Cross) */}
+        <div style={{ padding:"24px 20px 16px", borderBottom:"1px solid #fdf8f5", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <div style={{ position:"relative", flexShrink:0 }}>
+              {/* Medical Heart Logo SVG */}
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#ff5a50" />
+                <path d="M12 3.82c-1.09-1.28-2.76-2.09-4.5-2.09C4.42 1.73 2 7.23 2 7.23c0 3.78 3.4 6.86 8.55 11.54L12 20.08V3.82z" fill="#0ea5e9" />
+                <path d="M10.5 10.5h3v3h3v3h-3v3h-3v-3h-3v-3h3v-3z" fill="#ffffff" style={{ transform: "translate(0.5px, 0.5px) scale(0.8)", transformOrigin: "12px 12px" }} />
+              </svg>
+            </div>
+            <div>
+              <div style={{ fontWeight:800, fontSize:13, color:"#0f172a", lineHeight:1.2, letterSpacing:"-0.2px" }}>Sistem</div>
+              <div style={{ fontWeight:800, fontSize:13, color:"#0f172a", lineHeight:1.2, letterSpacing:"-0.2px" }}>Manajemen</div>
+              <div style={{ fontWeight:800, fontSize:13, color:"#ff5a50", lineHeight:1.2, letterSpacing:"-0.2px" }}>Klinik AI</div>
+            </div>
+          </div>
+          <button onClick={() => setIsSidebarOpen(false)} className="md:hidden"
+            style={{ padding:6, borderRadius:10, border:"none", background:"#fcf8f5", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <X style={{ width:16, height:16, color:"#64748b" }} />
+          </button>
+        </div>
+
+        {/* Nav */}
+        <nav style={{ flex:1, overflowY:"auto", padding:"16px 14px", display:"flex", flexDirection:"column", gap:2 }}>
+          {menuItems.map((item) => {
+            const isActive = activeTab === item.name;
+            const Icon = item.icon;
+            return (
+              <button key={item.name}
+                onClick={() => { setActiveTab(item.name as Tab); setIsSidebarOpen(false); }}
+                style={{
+                  width:"100%", display:"flex", alignItems:"center", gap:12,
+                  padding:"10px 14px", borderRadius:12, border:"none", cursor:"pointer",
+                  background: isActive ? "linear-gradient(135deg, #ff5a50, #ff7860)" : "transparent",
+                  color: isActive ? "#fff" : "#334155",
+                  fontWeight: isActive ? 700 : 600,
+                  fontSize: 13,
+                  transition:"all 0.2s ease",
+                  boxShadow: isActive ? "0 4px 12px rgba(255,90,80,0.25)" : "none",
+                  textAlign:"left"
+                }}
+                onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = "#fdf9f6"; }}
+                onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}>
+                <Icon style={{ width:18, height:18, color: isActive ? "#fff" : item.color, flexShrink:0 }} />
+                <span>{item.name}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* AI Banner Footer */}
+        <div style={{ padding:"12px 14px 20px" }}>
+          <div style={{ borderRadius:20, padding:16, background:"#fff2eb", border:"1px solid #ffd8c2", position:"relative", overflow:"hidden", boxShadow:"0 4px 10px rgba(255,107,80,0.05)" }}>
+            <div style={{ fontWeight:800, fontSize:12, color:"#0f172a", marginBottom:2 }}>Kelola klinik lebih</div>
+            <div style={{ fontWeight:800, fontSize:12, color:"#0f172a", marginBottom:6 }}>cerdas dengan AI</div>
+            <p style={{ fontSize:10, color:"#64748b", lineHeight:1.5, marginBottom:12, maxWidth:"80%" }}>
+              Dapatkan insight, ringkasan pasien, dan rekomendasi klinik secara instan.
+            </p>
+            
+            {/* Female Doctor Cartoon Illustration SVG */}
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+              <button onClick={() => setActiveTab("AI Assistant")}
+                style={{
+                  background:"#0d9488", color:"#fff", border:"none", borderRadius:10,
+                  padding:"8px 14px", fontSize:11, fontWeight:700, cursor:"pointer",
+                  display:"flex", alignItems:"center", gap:4, zIndex:2, boxShadow:"0 2px 6px rgba(13,148,136,0.2)"
+                }}>
+                Pelajari Selengkapnya →
+              </button>
+              
+              <div style={{ position:"absolute", right:4, bottom:-2, width:64, height:72, zIndex:1 }}>
+                <svg width="100%" height="100%" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  {/* Doctor cartoon illustration */}
+                  <path d="M20 70c0-12 12-16 28-16s28 4 28 16v20H20V70z" fill="#2d6a4f" />
+                  <path d="M41 54l7 14 7-14h-14z" fill="#fff" />
+                  <circle cx="48" cy="38" r="15" fill="#ffd166" />
+                  <path d="M33 38c0-12 6-18 15-18s15 6 15 18c0 5-1 10-3 12-2-9-5-11-12-11s-10 2-12 11c-2-2-3-7-3-12z" fill="#1e293b" />
+                  <circle cx="43" cy="36" r="1.5" fill="#1e293b" />
+                  <circle cx="53" cy="36" r="1.5" fill="#1e293b" />
+                  <path d="M45 42c1 1.5 3 1.5 4 0" stroke="#1e293b" strokeWidth="1.2" strokeLinecap="round" />
+                  <path d="M38 56c2 4 4 6 10 6s8-2 10-6" stroke="#94a3b8" strokeWidth="1.5" fill="none" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* MAIN CONTAINER */}
+      <div style={{ flex:1, display:"flex", flexDirection:"column", minWidth:0, paddingLeft:230 }} className="md:pl-[230px]">
+
+        {/* HEADER */}
+        <header style={{ height:70, background:"#fff", borderBottom:"1px solid #f3e8e2", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 28px", flexShrink:0, position:"sticky", top:0, zIndex:20 }}>
+          
+          {/* Clinic Selector Dropdown */}
+          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+            <button onClick={() => setIsSidebarOpen(true)} className="md:hidden"
+              style={{ padding:8, borderRadius:12, background:"#fcf8f5", border:"1px solid #f3e8e2", cursor:"pointer", display:"flex", alignItems:"center" }}>
+              <Menu style={{ width:18, height:18, color:"#64748b" }} />
+            </button>
+            <div style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 16px", borderRadius:16, border:"1px solid #f3e8e2", background:"#fff" }}>
+              <div style={{ width:24, height:24, borderRadius:8, background:"#eff6ff", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <Building2 style={{ width:14, height:14, color:"#3b82f6" }} />
+              </div>
+              <button style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", fontSize:12.5, fontWeight:700, color:"#0f172a" }}>
+                Klinik Sehat Sentosa - Cabang Semarang
+                <ChevronDown style={{ width:14, height:14, color:"#94a3b8" }} />
+              </button>
+            </div>
+          </div>
+
+          {/* Search bar */}
+          <div style={{ position:"relative", flex:1, maxWidth:420, margin:"0 24px", display:"none" }} className="md:block">
+            <Search style={{ position:"absolute", left:16, top:"50%", transform:"translateY(-50%)", width:16, height:16, color:"#94a3b8" }} />
+            <input type="text" placeholder="Cari pasien, appointment, atau menu..."
+              style={{
+                width:"100%", paddingLeft:42, paddingRight:16, paddingTop:10, paddingBottom:10,
+                borderRadius:24, border:"1.5px solid #f3e8e2", background:"#f6eeea",
+                fontSize:12.5, color:"#1e293b", fontFamily:"inherit", outline:"none"
+              }} />
+          </div>
+
+          {/* Notification & User Profile dropdown */}
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            {/* Bell Icon */}
+            <button style={{ position:"relative", padding:9, borderRadius:12, background:"#fff", border:"1px solid #f3e8e2", cursor:"pointer", display:"flex", alignItems:"center" }}>
+              <Bell style={{ width:17, height:17, color:"#64748b" }} />
+              <span style={{ position:"absolute", top:-3, right:-3, width:16, height:16, borderRadius:"50%", background:"#ff5a50", color:"#fff", fontSize:9, fontWeight:900, display:"flex", alignItems:"center", justifyContent:"center" }}>3</span>
+            </button>
+            
+            {/* Message Icon */}
+            <button style={{ position:"relative", padding:9, borderRadius:12, background:"#fff", border:"1px solid #f3e8e2", cursor:"pointer", display:"flex", alignItems:"center" }}>
+              <MessageSquare style={{ width:17, height:17, color:"#64748b" }} />
+              <span style={{ position:"absolute", top:-3, right:-3, width:16, height:16, borderRadius:"50%", background:"#ff5a50", color:"#fff", fontSize:9, fontWeight:900, display:"flex", alignItems:"center", justifyContent:"center" }}>2</span>
+            </button>
+
+            {/* Profile */}
+            <div style={{ position:"relative" }}>
+              <button onClick={() => setShowDocMenu(!showDocMenu)}
+                style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 12px 6px 6px", borderRadius:16, background:"#fff", border:"1px solid #f3e8e2", cursor:"pointer" }}>
+                <div style={{ width:32, height:32, borderRadius:"50%", background:"#eff6ff", display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden" }}>
+                  {/* Doctor cartoon head SVG */}
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="10" fill="#ccfbf1" />
+                    <circle cx="12" cy="10" r="4" fill="#0ea5e9" />
+                    <path d="M6 18c0-3 3-5 6-5s6 2 6 5H6z" fill="#0ea5e9" />
+                  </svg>
+                </div>
+                <div style={{ textAlign:"left", display:"none" }} className="sm:block">
+                  <div style={{ fontSize:12.5, fontWeight:750, color:"#0f172a", lineHeight:1.2 }}>dr. Maya Lestari</div>
+                  <div style={{ fontSize:10.5, color:"#64748b" }}>Dokter Umum</div>
+                </div>
+                <ChevronDown style={{ width:14, height:14, color:"#94a3b8" }} />
+              </button>
+              {showDocMenu && (
+                <div style={{ position:"absolute", right:0, top:"calc(100% + 8px)", width:192, background:"#fff", border:"1px solid #f3e8e2", borderRadius:16, boxShadow:"0 8px 24px rgba(243,232,226,0.3)", padding:8, zIndex:50 }}>
+                  <button style={{ width:"100%", textAlign:"left", padding:"8px 10px", borderRadius:10, border:"none", background:"none", cursor:"pointer", fontSize:12, fontWeight:600, color:"#334155" }}>Profil Dokter</button>
+                  <button style={{ width:"100%", textAlign:"left", padding:"8px 10px", borderRadius:10, border:"none", background:"none", cursor:"pointer", fontSize:12, fontWeight:600, color:"#334155" }}>Pengaturan Akun</button>
+                  <div style={{ height:1, background:"#f3e8e2", margin:"4px 0" }} />
+                  <button onClick={() => { setShowDocMenu(false); alert("Keluar dari sesi."); }}
+                    style={{ width:"100%", textAlign:"left", padding:"8px 10px", borderRadius:10, border:"none", background:"none", cursor:"pointer", fontSize:12, fontWeight:600, color:"#dc2626", display:"flex", alignItems:"center", gap:6 }}>
+                    <LogOut style={{ width:14, height:14 }} /> Keluar
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* WORKSPACE */}
+        <main style={{ flex:1, overflowY:"auto", padding:"24px 28px 40px" }}>
+          <div style={{ maxWidth:1500, margin:"0 auto" }}>
+            {activeTab === "Dashboard"    && <DashboardView />}
+            {activeTab === "Pasien"       && <PatientsView onMakeAppointment={handleMakeAppointmentForPatient} onStartEncounter={handleStartEncounter} />}
+            {activeTab === "Appointment"  && <AppointmentsView initialPatient={prefilledPatientForAppt} onClearInitialPatient={() => setPrefilledPatientForAppt(null)} />}
+            {activeTab === "Antrean"      && <QueueView />}
+            {activeTab === "Encounter"    && <EncounterView initialPatient={prefilledPatientForEncounter} onClearInitialPatient={() => setPrefilledPatientForEncounter(null)} />}
+            {activeTab === "Laboratorium" && <LabView />}
+            {activeTab === "Farmasi"      && <PharmacyView />}
+            {activeTab === "Billing"      && <BillingView />}
+            {activeTab === "Dokumen"      && <DocumentsView />}
+            {activeTab === "Audit Log"    && <AuditLogView />}
+            {activeTab === "Pengaturan"   && <SettingsView />}
+            {activeTab === "AI Assistant" && (
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"60vh", textAlign:"center", padding:40 }}>
+                <div style={{ width:80, height:80, borderRadius:"50%", background:"linear-gradient(135deg,#ff5a50,#0d9488)", display:"flex", alignItems:"center", justifyContent:"center", marginBottom:24 }}>
+                  <Sparkles style={{ width:40, height:40, color:"#fff" }} />
+                </div>
+                <h2 style={{ fontSize:22, fontWeight:800, color:"#0f172a", marginBottom:8 }}>AI Clinical Assistant</h2>
+                <p style={{ fontSize:14, color:"#64748b", marginBottom:8 }}>Modul asisten klinis AI ini sedang dinonaktifkan sementara.</p>
+                <p style={{ fontSize:12, color:"#94a3b8", maxWidth:340, marginBottom:32 }}>Hubungi administrator klinik untuk mengaktifkan modul asisten ini.</p>
+                <button onClick={() => setActiveTab("Dashboard")}
+                  style={{ padding:"12px 28px", borderRadius:12, background:"#0d9488", color:"#fff", border:"none", fontSize:14, fontWeight:700, cursor:"pointer", boxShadow:"0 4px 12px rgba(13,148,136,0.3)" }}>
+                  Kembali ke Dashboard
+                </button>
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}

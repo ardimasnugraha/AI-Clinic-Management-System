@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+:root {
+  --bg-page: #faf6f3;
+  --bg-card: #ffffff;
+  --bg-sidebar: #fffcfb;
+  --color-primary: #0d9488;
+  --color-coral: #ff5a50;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --border-color: #f3e8e2;
+}
+
+@theme inline {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  
+  --color-slate-50: #fdfbf7;
+  --color-slate-100: #fcf8f5;
+  --color-slate-200: #f3e8e2;
+  --color-slate-450: #64748b;
+  --color-slate-550: #475569;
+  --color-slate-650: #1e293b;
+  --color-slate-750: #0f172a;
+  --color-slate-800: #0f172a;
+  --color-slate-850: #0f172a;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #000000;
+  
+  --color-teal-650: #0d9488;
+  --color-orange-650: #ea580c;
+  --color-red-650: #ff5a50;
+  --color-yellow-350: #f59e0b;
+}
+
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background-color: #f0f7ff !important;
+  color: #000000 !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ======================== SCROLLBAR ======================== */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ======================== ANIMATIONS ======================== */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.animate-fade-in { animation: fadeInUp 0.3s ease-out; }
+
+/* ======================== STATUS BADGES ======================== */
+.badge-aktif     { background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; border-radius:20px; padding:3px 10px; font-size:11px; font-weight:700; display:inline-block; }
+.badge-menunggu  { background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; border-radius:20px; padding:3px 10px; font-size:11px; font-weight:700; display:inline-block; }
+.badge-dipanggil { background:#dbeafe; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:20px; padding:3px 10px; font-size:11px; font-weight:700; display:inline-block; }
+.badge-berjalan  { background:#ede9fe; color:#6d28d9; border:1px solid #ddd6fe; border-radius:20px; padding:3px 10px; font-size:11px; font-weight:700; display:inline-block; }
+.badge-selesai   { background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; border-radius:20px; padding:3px 10px; font-size:11px; font-weight:700; display:inline-block; }
+.badge-baru      { background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; border-radius:20px; padding:3px 10px; font-size:11px; font-weight:700; display:inline-block; }
+.badge-nonaktif  { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; border-radius:20px; padding:3px 10px; font-size:11px; font-weight:700; display:inline-block; }
+
+/* ======================== AI PANEL ======================== */
+.ai-gradient { background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #0d9488 100%); }
+
+/* ======================== CARD ======================== */
+.klinik-card {
+  background: #fff;
+  border: 1px solid #e8f0fe;
+  border-radius: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  transition: box-shadow 0.2s;
+}
+.klinik-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.09); }
+
+/* ======================== SIDEBAR ACTIVE ======================== */
+.sidebar-active {
+  background: linear-gradient(135deg, #ff6b35, #ff8f60) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 14px rgba(255,107,53,0.35);
+}
+
+/* ======================== HIGH CONTRAST BLACK TEXT OVERRIDE ======================== */
+body, p, label, td, th, h1, h2, h3, h4, h5, h6 {
+  color: #000000 !important;
+}
+button, button *, a, [class*="badge-"], .sidebar-active, .sidebar-active *, [class*="status-"] {
+  color: revert !important;
+}
+
+
+

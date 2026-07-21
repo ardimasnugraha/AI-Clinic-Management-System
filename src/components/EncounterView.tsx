@@ -148,7 +148,7 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
     }
   };
 
-  const applySoapTemplate = (type: "flu" | "hipertensi" | "gigi") => {
+  const applySoapTemplate = (type: "flu" | "hipertensi" | "gigi" | "diabetes" | "diare" | "asma") => {
     if (type === "flu") {
       setSoap({
         S: "Pasien mengeluh demam sejak 2 hari, disertai batuk berdahak, pilek, dan tenggorokan sakit.",
@@ -187,6 +187,45 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
         { nama: "Asam Mefenamat 500mg", dosis: "3x1 Tablet (Sesudah Makan)", jumlah: 10, harga: 15000 }
       ]);
       showToast("Template SOAP Sakit Gigi diterapkan!");
+    } else if (type === "diabetes") {
+      setSoap({
+        S: "Pasien datang untuk kontrol rutin diabetes, tidak ada keluhan berarti.",
+        O: "GDS: 150 mg/dL, TD: 120/80 mmHg, Nadi: 80 x/menit, Suhu: 36.5°C, BB: 65 kg.",
+        A: "Diabetes Mellitus Tipe 2 (ICD-10: E11.9)",
+        P: "1. Metformin 500mg 2x1 tablet (sesudah makan)\n2. Edukasi diet rendah gula\n3. Kontrol ulang 1 bulan lagi."
+      });
+      setVitals({ td: "120/80", nadi: "80", suhu: "36.5", rr: "18", spo2: "99", bb: "65" });
+      setPrescriptions([
+        { nama: "Metformin 500mg", dosis: "2x1 Tablet (Sesudah Makan)", jumlah: 60, harga: 30000 }
+      ]);
+      showToast("Template SOAP Diabetes diterapkan!");
+    } else if (type === "diare") {
+      setSoap({
+        S: "Pasien mengeluh BAB cair >3 kali sejak semalam, mual, dan lemas.",
+        O: "Bising usus meningkat, Turgor kulit normal. TD: 110/70 mmHg, Nadi: 88 x/menit, Suhu: 37.2°C.",
+        A: "Gastroenteritis / Diare Akut (ICD-10: A09)",
+        P: "1. Oralit tiap habis BAB cair\n2. Attapulgite 2 tablet tiap habis BAB cair\n3. Zinc 20mg 1x1 tablet selama 10 hari\n4. Edukasi jaga hidrasi."
+      });
+      setVitals({ td: "110/70", nadi: "88", suhu: "37.2", rr: "20", spo2: "98", bb: "60" });
+      setPrescriptions([
+        { nama: "Oralit", dosis: "Sesuai Kebutuhan (Tiap BAB Cair)", jumlah: 10, harga: 15000 },
+        { nama: "Attapulgite", dosis: "2 Tablet Tiap BAB Cair", jumlah: 10, harga: 20000 },
+        { nama: "Zinc 20mg", dosis: "1x1 Tablet (Habiskan)", jumlah: 10, harga: 25000 }
+      ]);
+      showToast("Template SOAP Diare diterapkan!");
+    } else if (type === "asma") {
+      setSoap({
+        S: "Pasien mengeluh sesak napas dan batuk sejak pagi, riwayat asma (+).",
+        O: "Terdengar wheezing di kedua lapang paru. TD: 120/80 mmHg, Nadi: 90 x/menit, Suhu: 36.7°C, RR: 24 x/menit, SpO2: 95%.",
+        A: "Asma Bronkial Eksaserbasi Akut (ICD-10: J45.9)",
+        P: "1. Salbutamol 2mg 3x1 tablet\n2. Dexamethasone 0.5mg 3x1 tablet\n3. Hindari alergen (debu, dingin)."
+      });
+      setVitals({ td: "120/80", nadi: "90", suhu: "36.7", rr: "24", spo2: "95", bb: "62" });
+      setPrescriptions([
+        { nama: "Salbutamol 2mg", dosis: "3x1 Tablet (Sesudah Makan)", jumlah: 15, harga: 15000 },
+        { nama: "Dexamethasone 0.5mg", dosis: "3x1 Tablet (Sesudah Makan)", jumlah: 15, harga: 10000 }
+      ]);
+      showToast("Template SOAP Asma diterapkan!");
     }
   };
 
@@ -428,6 +467,15 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
                 </button>
                 <button onClick={() => applySoapTemplate("gigi")} style={{ background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
                   + Sakit Gigi
+                </button>
+                <button onClick={() => applySoapTemplate("diabetes")} style={{ background: "#f0fdfa", color: "#0f766e", border: "1px solid #ccfbf1", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  + Diabetes
+                </button>
+                <button onClick={() => applySoapTemplate("diare")} style={{ background: "#fdf4ff", color: "#a21caf", border: "1px solid #fae8ff", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  + Diare
+                </button>
+                <button onClick={() => applySoapTemplate("asma")} style={{ background: "#f8fafc", color: "#334155", border: "1px solid #e2e8f0", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  + Asma
                 </button>
               </div>
 

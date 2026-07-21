@@ -148,84 +148,72 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
     }
   };
 
-  const applySoapTemplate = (type: "flu" | "hipertensi" | "gigi" | "diabetes" | "diare" | "asma") => {
-    if (type === "flu") {
+  const applySoapTemplate = (type: "gigi" | "jantung" | "kulit" | "demam" | "mata") => {
+    if (type === "gigi") {
       setSoap({
-        S: "Pasien mengeluh demam sejak 2 hari, disertai batuk berdahak, pilek, dan tenggorokan sakit.",
-        O: "TD: 110/70 mmHg, Nadi: 82 x/menit, Suhu: 38.2°C, RR: 20 x/menit, SpO2: 98%, BB: 60 kg.",
-        A: "ISPA / Infeksi Saluran Pernapasan Akut (ICD-10: J06.9)",
-        P: "1. Paracetamol 500mg 3x1 tablet (bila demam)\n2. Amoksisilin 500mg 3x1 tablet (habiskan)\n3. OBH Combi Sirup 3x1 cth\n4. Istirahat cukup & minum air hangat."
+        S: "Pasien mengeluh sakit gigi geraham bawah kanan berdenyut sejak 2 hari, bertambah ngilu saat minum dingin dan makan.",
+        O: "Pemeriksaan intraoral: Karies dentis profunda pada gigi 46, percusi (+), palpasi (-). Gusi sekitar hyperemia ringan.",
+        A: "Pulpitis Akut / Karies Gigi (ICD-10: K04.0)",
+        P: "1. Asam Mefenamat 500mg 3x1 tablet (pereda nyeri)\n2. Amoksisilin 500mg 3x1 tablet (habiskan)\n3. Pro penambalan / Perawatan Saluran Akar setelah peradangan mereda."
       });
-      setVitals({ td: "110/70", nadi: "82", suhu: "38.2", rr: "20", spo2: "98", bb: "60" });
+      setVitals({ td: "120/80", nadi: "80", suhu: "36.5", rr: "18", spo2: "99", bb: "65" });
+      setPrescriptions([
+        { nama: "Asam Mefenamat 500mg", dosis: "3x1 Tablet (Sesudah Makan)", jumlah: 10, harga: 15000 },
+        { nama: "Amoksisilin 500mg", dosis: "3x1 Kapsul (Sesudah Makan)", jumlah: 15, harga: 22500 }
+      ]);
+      showToast("Template SOAP Poli Gigi diterapkan!");
+    } else if (type === "jantung") {
+      setSoap({
+        S: "Pasien mengeluh dada kiri terasa berat seperti ditindih sejak tadi pagi, menjalar ke punggung, disertai sesak napas dan keringat dingin.",
+        O: "TD: 150/90 mmHg, Nadi: 96 x/menit, Suhu: 36.5°C, RR: 22 x/menit, SpO2: 97%. Auskultasi Jantung: BJ I-II reguler, gallop (-), murmur (-).",
+        A: "Angina Pektoris Unstable / Suspect Penyakit Jantung Koroner (ICD-10: I20.0)",
+        P: "1. ISDN 5mg Sublingual (bila nyeri dada)\n2. Aspirin 80mg 1x1 tablet\n3. Clopidogrel 75mg 1x1 tablet\n4. Rujuk Spesialis Jantung & Pembuluh Darah (Sp.JP) untuk EKG & Echocardiography."
+      });
+      setVitals({ td: "150/90", nadi: "96", suhu: "36.5", rr: "22", spo2: "97", bb: "70" });
+      setPrescriptions([
+        { nama: "Isosorbide Dinitrate (ISDN) 5mg", dosis: "1x1 Tablet Sublingual (Bila Nyeri)", jumlah: 10, harga: 25000 },
+        { nama: "Aspirin (Aspilet) 80mg", dosis: "1x1 Tablet (Sesudah Makan)", jumlah: 30, harga: 20000 },
+        { nama: "Clopidogrel 75mg", dosis: "1x1 Tablet (Sesudah Makan)", jumlah: 30, harga: 65000 }
+      ]);
+      showToast("Template SOAP Jantung diterapkan!");
+    } else if (type === "kulit") {
+      setSoap({
+        S: "Pasien mengeluh gatal-gatal dan kemerahan pada lengan dan leher sejak 3 hari, terasa panas dan gatal bertambah saat berkeringat.",
+        O: "Status Dermatologis: Tampak plak eritematosa dengan papul dan ekskoriasi pada regio brachii dan colli. Tanda infeksi sekunder (-).",
+        A: "Dermatitis Kontak Alergi (ICD-10: L23.9)",
+        P: "1. Cetirizine 10mg 1x1 tablet (malam hari)\n2. Hydrocortisone Krim 1% dioles tipis 2x sehari\n3. Edukasi hindari menggaruk dan kurangi paparan sabun keras/alergen."
+      });
+      setVitals({ td: "120/80", nadi: "78", suhu: "36.6", rr: "18", spo2: "99", bb: "58" });
+      setPrescriptions([
+        { nama: "Cetirizine 10mg", dosis: "1x1 Tablet Malam (Sesudah Makan)", jumlah: 10, harga: 12000 },
+        { nama: "Hydrocortisone Cream 1% 5g", dosis: "2x Sehari Dioles Tipis", jumlah: 1, harga: 18000 }
+      ]);
+      showToast("Template SOAP Kulit diterapkan!");
+    } else if (type === "demam") {
+      setSoap({
+        S: "Pasien mengeluh demam tinggi mendadak sejak 3 hari, disertai sakit kepala, nyeri belakang mata, mual, dan pegal seluruh badan.",
+        O: "TD: 110/70 mmHg, Nadi: 88 x/menit, Suhu: 38.8°C, RR: 20 x/menit, SpO2: 98%. Rumple Leede (-), konjungtiva hiperemis (-).",
+        A: "Demam Dengue / Dengue Fever (ICD-10: A90)",
+        P: "1. Paracetamol 500mg 3x1-4x1 tablet (bila demam >38°C)\n2. Rehidrasi cairan oral (minum air hangat/oralit min 2-3 Liter/hari)\n3. Cek Laboratorium Darah Lengkap (Hb, Ht, Leukosit, Trombosit)\n4. Edukasi tanda bahaya (perdarahan, muntah terus-menerus)."
+      });
+      setVitals({ td: "110/70", nadi: "88", suhu: "38.8", rr: "20", spo2: "98", bb: "60" });
       setPrescriptions([
         { nama: "Paracetamol 500mg", dosis: "3x1 Tablet (Bila Demam)", jumlah: 10, harga: 10000 },
-        { nama: "Amoksisilin 500mg", dosis: "3x1 Kapsul (Sesudah Makan)", jumlah: 15, harga: 22500 },
-        { nama: "OBH Combi Sirup 100ml", dosis: "3x1 Sendok Teh", jumlah: 1, harga: 18000 }
+        { nama: "Oralit 200ml", dosis: "Sesuai Kebutuhan (Minum Banyak)", jumlah: 10, harga: 15000 }
       ]);
-      showToast("Template SOAP Demam & Flu diterapkan!");
-    } else if (type === "hipertensi") {
+      showToast("Template SOAP Demam diterapkan!");
+    } else if (type === "mata") {
       setSoap({
-        S: "Pasien datang untuk kontrol rutin hipertensi. Mengeluh kadang tengkuk terasa berat.",
-        O: "TD: 140/90 mmHg, Nadi: 84 x/menit, Suhu: 36.6°C, RR: 18 x/menit, SpO2: 98%, BB: 70 kg.",
-        A: "Hipertensi Essential / Primer (ICD-10: I10)",
-        P: "1. Amlodipine 5mg 1x1 tablet pagi hari\n2. Edukasi diet rendah garam & olahraga teratur\n3. Kontrol ulang 2 minggu lagi."
+        S: "Pasien mengeluh mata kanan merah, berair, perih, dan mengganjal sejak kemarin pagi. Kotoran mata lengket saat bangun tidur.",
+        O: "Pemeriksaan Oftalmologis OD: Injeksi konjungtiva (+), sekret seromukopurulen (+), kornea jernih, refleks cahaya (+/+), visus 6/6.",
+        A: "Konjungtivitis Bakteri OD (ICD-10: H10.0)",
+        P: "1. Chloramphenicol Tetes Mata 0.5% 4x1-2 tetes pada mata kanan\n2. Edukasi jangan mengucek mata, bersihkan sekret dengan kapas basah, cuci tangan sebelum/sesudah tetes mata."
       });
-      setVitals({ td: "140/90", nadi: "84", suhu: "36.6", rr: "18", spo2: "98", bb: "70" });
+      setVitals({ td: "120/80", nadi: "76", suhu: "36.5", rr: "16", spo2: "99", bb: "62" });
       setPrescriptions([
-        { nama: "Amlodipine 5mg", dosis: "1x1 Tablet Pagi (Sesudah Makan)", jumlah: 30, harga: 45000 }
+        { nama: "Chloramphenicol Eye Drops 0.5% 5ml", dosis: "4x2 Tetes Mata Kanan", jumlah: 1, harga: 22000 }
       ]);
-      showToast("Template SOAP Hipertensi diterapkan!");
-    } else if (type === "gigi") {
-      setSoap({
-        S: "Pasien mengeluh sakit gigi geraham bawah kanan sejak semalam, ngilu saat minum dingin.",
-        O: "Pemeriksaan intraoral: Karies dentis profunda pada gigi 46. Percusi (+), Palpasi (-).",
-        A: "Pulpitis Akut / Karies Gigi (ICD-10: K02.9)",
-        P: "1. Asam Mefenamat 500mg 3x1 tablet (pereda nyeri)\n2. Penambalan sementara / Pro premedikasi."
-      });
-      setVitals({ td: "120/80", nadi: "80", suhu: "36.5", rr: "18", spo2: "99", bb: "65" });
-      setPrescriptions([
-        { nama: "Asam Mefenamat 500mg", dosis: "3x1 Tablet (Sesudah Makan)", jumlah: 10, harga: 15000 }
-      ]);
-      showToast("Template SOAP Sakit Gigi diterapkan!");
-    } else if (type === "diabetes") {
-      setSoap({
-        S: "Pasien datang untuk kontrol rutin diabetes, tidak ada keluhan berarti.",
-        O: "GDS: 150 mg/dL, TD: 120/80 mmHg, Nadi: 80 x/menit, Suhu: 36.5°C, BB: 65 kg.",
-        A: "Diabetes Mellitus Tipe 2 (ICD-10: E11.9)",
-        P: "1. Metformin 500mg 2x1 tablet (sesudah makan)\n2. Edukasi diet rendah gula\n3. Kontrol ulang 1 bulan lagi."
-      });
-      setVitals({ td: "120/80", nadi: "80", suhu: "36.5", rr: "18", spo2: "99", bb: "65" });
-      setPrescriptions([
-        { nama: "Metformin 500mg", dosis: "2x1 Tablet (Sesudah Makan)", jumlah: 60, harga: 30000 }
-      ]);
-      showToast("Template SOAP Diabetes diterapkan!");
-    } else if (type === "diare") {
-      setSoap({
-        S: "Pasien mengeluh BAB cair >3 kali sejak semalam, mual, dan lemas.",
-        O: "Bising usus meningkat, Turgor kulit normal. TD: 110/70 mmHg, Nadi: 88 x/menit, Suhu: 37.2°C.",
-        A: "Gastroenteritis / Diare Akut (ICD-10: A09)",
-        P: "1. Oralit tiap habis BAB cair\n2. Attapulgite 2 tablet tiap habis BAB cair\n3. Zinc 20mg 1x1 tablet selama 10 hari\n4. Edukasi jaga hidrasi."
-      });
-      setVitals({ td: "110/70", nadi: "88", suhu: "37.2", rr: "20", spo2: "98", bb: "60" });
-      setPrescriptions([
-        { nama: "Oralit", dosis: "Sesuai Kebutuhan (Tiap BAB Cair)", jumlah: 10, harga: 15000 },
-        { nama: "Attapulgite", dosis: "2 Tablet Tiap BAB Cair", jumlah: 10, harga: 20000 },
-        { nama: "Zinc 20mg", dosis: "1x1 Tablet (Habiskan)", jumlah: 10, harga: 25000 }
-      ]);
-      showToast("Template SOAP Diare diterapkan!");
-    } else if (type === "asma") {
-      setSoap({
-        S: "Pasien mengeluh sesak napas dan batuk sejak pagi, riwayat asma (+).",
-        O: "Terdengar wheezing di kedua lapang paru. TD: 120/80 mmHg, Nadi: 90 x/menit, Suhu: 36.7°C, RR: 24 x/menit, SpO2: 95%.",
-        A: "Asma Bronkial Eksaserbasi Akut (ICD-10: J45.9)",
-        P: "1. Salbutamol 2mg 3x1 tablet\n2. Dexamethasone 0.5mg 3x1 tablet\n3. Hindari alergen (debu, dingin)."
-      });
-      setVitals({ td: "120/80", nadi: "90", suhu: "36.7", rr: "24", spo2: "95", bb: "62" });
-      setPrescriptions([
-        { nama: "Salbutamol 2mg", dosis: "3x1 Tablet (Sesudah Makan)", jumlah: 15, harga: 15000 },
-        { nama: "Dexamethasone 0.5mg", dosis: "3x1 Tablet (Sesudah Makan)", jumlah: 15, harga: 10000 }
-      ]);
-      showToast("Template SOAP Asma diterapkan!");
+      showToast("Template SOAP Mata diterapkan!");
     }
   };
 
@@ -459,23 +447,20 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
               {/* Template Buttons */}
               <div style={{ background: "#f8fafc", padding: "12px 16px", borderRadius: 12, border: "1px solid #e2e8f0", marginBottom: 20, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 11.5, fontWeight: 800, color: "#475569" }}>⚡ Quick Template SOAP:</span>
-                <button onClick={() => applySoapTemplate("flu")} style={{ background: "#e0f2fe", color: "#0369a1", border: "1px solid #bae6fd", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
-                  + Demam & Flu
-                </button>
-                <button onClick={() => applySoapTemplate("hipertensi")} style={{ background: "#fff7ed", color: "#c2410c", border: "1px solid #ffedd5", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
-                  + Kontrol Hipertensi
-                </button>
                 <button onClick={() => applySoapTemplate("gigi")} style={{ background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
-                  + Sakit Gigi
+                  🦷 Poli Gigi
                 </button>
-                <button onClick={() => applySoapTemplate("diabetes")} style={{ background: "#f0fdfa", color: "#0f766e", border: "1px solid #ccfbf1", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
-                  + Diabetes
+                <button onClick={() => applySoapTemplate("jantung")} style={{ background: "#fff1f2", color: "#be123c", border: "1px solid #ffe4e6", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  ❤️ Jantung
                 </button>
-                <button onClick={() => applySoapTemplate("diare")} style={{ background: "#fdf4ff", color: "#a21caf", border: "1px solid #fae8ff", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
-                  + Diare
+                <button onClick={() => applySoapTemplate("kulit")} style={{ background: "#fff7ed", color: "#c2410c", border: "1px solid #ffedd5", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  🧴 Kulit / Dermatologi
                 </button>
-                <button onClick={() => applySoapTemplate("asma")} style={{ background: "#f8fafc", color: "#334155", border: "1px solid #e2e8f0", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
-                  + Asma
+                <button onClick={() => applySoapTemplate("demam")} style={{ background: "#e0f2fe", color: "#0369a1", border: "1px solid #bae6fd", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  🌡️ Demam
+                </button>
+                <button onClick={() => applySoapTemplate("mata")} style={{ background: "#f0fdf4", color: "#15803d", border: "1px solid #dcfce7", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  👁️ Mata / Oftalmologi
                 </button>
               </div>
 

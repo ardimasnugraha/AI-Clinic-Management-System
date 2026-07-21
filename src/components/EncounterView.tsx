@@ -217,14 +217,86 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
     }
   };
 
-  const handleAddMedicine = () => {
-    if (!newMed.nama.trim()) {
+  const commonMedications = [
+    { nama: "Paracetamol 500mg", dosis: "3x1 Tablet (Bila Demam)", jumlah: 10, harga: 10000 },
+    { nama: "Amoksisilin 500mg", dosis: "3x1 Kapsul (Habiskan)", jumlah: 15, harga: 22500 },
+    { nama: "Asam Mefenamat 500mg", dosis: "3x1 Tablet (Sesudah Makan)", jumlah: 10, harga: 15000 },
+    { nama: "Cetirizine 10mg", dosis: "1x1 Tablet Malam", jumlah: 10, harga: 12000 },
+    { nama: "Amlodipine 5mg", dosis: "1x1 Tablet Pagi", jumlah: 30, harga: 45000 },
+    { nama: "Metformin 500mg", dosis: "2x1 Tablet (Sesudah Makan)", jumlah: 60, harga: 30000 },
+    { nama: "Cefadroxil 500mg", dosis: "2x1 Kapsul (Habiskan)", jumlah: 10, harga: 35000 },
+    { nama: "Antasida Doen", dosis: "3x1 Tablet Sebelum Makan", jumlah: 10, harga: 8000 },
+    { nama: "Dexamethasone 0.5mg", dosis: "3x1 Tablet (Sesudah Makan)", jumlah: 15, harga: 10000 },
+    { nama: "Chloramphenicol Tetes Mata 0.5%", dosis: "4x2 Tetes Mata Kanan", jumlah: 1, harga: 22000 },
+    { nama: "Hydrocortisone Cream 1%", dosis: "2x Sehari Dioles Tipis", jumlah: 1, harga: 18000 },
+    { nama: "Oralit 200ml", dosis: "Sesuai Kebutuhan (Tiap BAB)", jumlah: 10, harga: 15000 }
+  ];
+
+  const syncRxToSoapPlan = (rxList: any[]) => {
+    if (rxList.length === 0) {
+      alert("Daftar resep obat masih kosong.");
+      return;
+    }
+    const rxLines = rxList.map((m, i) => `${i + 1}. ${m.nama} — ${m.dosis} (${m.jumlah} pcs)`).join("\n");
+    setSoap(prev => {
+      const cleanP = prev.P.split("\n--- Resep Obat ---")[0].trim();
+      const updatedP = cleanP 
+        ? `${cleanP}\n\n--- Resep Obat ---\n${rxLines}`
+        : `--- Resep Obat ---\n${rxLines}`;
+      return { ...prev, P: updatedP };
+    });
+    showToast("SOAP Plan (P) berhasil disinkronkan dengan Daftar Resep Obat!");
+  };
+
+  const syncSoapPlanToRx = () => {
+    if (!soap.P.trim()) {
+      alert("Catatan SOAP Plan (P) masih kosong.");
+      return;
+    }
+    const lines = soap.P.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+    const parsedMeds: any[] = [];
+
+    lines.forEach(line => {
+      const cleanLine = line.replace(/^[0-9]+[\.\)\-]\s*/, "");
+      const lower = cleanLine.toLowerCase();
+      if (lower.includes("edukasi") || lower.includes("kontrol") || lower.includes("rujuk") || lower.startsWith("---")) {
+        return;
+      }
+      if (cleanLine.length > 3) {
+        parsedMeds.push({
+          nama: cleanLine.split("(")[0].split("-")[0].trim() || cleanLine,
+          dosis: cleanLine.includes("(") ? cleanLine.split("(")[1].replace(")", "") : "Sesuai petunjuk dokter",
+          jumlah: 10,
+          harga: 15000
+        });
+      }
+    });
+
+    if (parsedMeds.length > 0) {
+      setPrescriptions(parsedMeds);
+      showToast(`${parsedMeds.length} obat berhasil diimpor dari SOAP Plan!`);
+    } else {
+      alert("Tidak ditemukan baris resep obat yang valid di SOAP Plan (P).");
+    }
+  };
+
+  const handleAddMedicine = (customMed?: any) => {
+    const medToAdd = customMed || newMed;
+    if (!medToAdd.nama.trim()) {
       alert("Nama Obat wajib diisi.");
       return;
     }
-    setPrescriptions([...prescriptions, { ...newMed }]);
-    setNewMed({ nama: "Paracetamol 500mg", dosis: "3x1 sesudah makan", jumlah: 10, harga: 10000 });
-    showToast("Obat berhasil ditambahkan ke resep!");
+    setPrescriptions(prev => [...prev, { ...medToAdd }]);
+    if (!customMed) {
+      setNewMed({ nama: "Paracetamol 500mg", dosis: "3x1 sesudah makan", jumlah: 10, harga: 10000 });
+    }
+    showToast(`Obat ${medToAdd.nama} berhasil ditambahkan!`);
+  };
+
+  const handleUpdateMedicine = (idx: number, field: string, value: any) => {
+    const updated = [...prescriptions];
+    updated[idx] = { ...updated[idx], [field]: value };
+    setPrescriptions(updated);
   };
 
   const handleRemoveMedicine = (idx: number) => {
@@ -483,6 +555,39 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
                       placeholder={s.ph}
                       style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${s.color}44`, background: "#f8fafc", fontSize: 13, color: "#1e293b", fontFamily: "inherit", resize: "vertical", outline: "none", lineHeight: 1.6 }} 
                     />
+
+                    {s.key === "P" && (
+                      <div style={{ marginTop: 10, background: "#fff7ed", padding: "10px 14px", borderRadius: 12, border: "1px solid #ffedd5", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <Pill style={{ width: 16, height: 16, color: "#ea580c" }} />
+                          <div>
+                            <span style={{ fontSize: 12, fontWeight: 800, color: "#9a3412", display: "block" }}>
+                              Daftar Resep Obat Terkait: {prescriptions.length} Obat
+                            </span>
+                            <span style={{ fontSize: 11, color: "#c2410c" }}>
+                              {prescriptions.length > 0 ? prescriptions.map(p => p.nama).join(", ") : "Belum ada obat di resep"}
+                            </span>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button 
+                            onClick={() => syncRxToSoapPlan(prescriptions)}
+                            style={{ background: "#ea580c", color: "#fff", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                            🔄 Sync Ke SOAP Plan
+                          </button>
+                          <button 
+                            onClick={syncSoapPlanToRx}
+                            style={{ background: "#fff", color: "#ea580c", border: "1px solid #fdba74", borderRadius: 8, padding: "6px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                            📥 Import Dari Plan
+                          </button>
+                          <button 
+                            onClick={() => setActiveTab("Resep Obat")}
+                            style={{ background: "#fff", color: "#475569", border: "1px solid #cbd5e1", borderRadius: 8, padding: "6px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                            Kelola Resep →
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -560,70 +665,164 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
           {/* TAB: RESEP OBAT */}
           {activeTab === "Resep Obat" && (
             <Container style={{ padding: 24 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", margin: "0 0 16px" }}>Daftar Resep Obat Pasien</h3>
-
-              <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1.5px solid #e2e8f0", marginBottom: 20, display: "flex", flexDirection: "column", gap: 12 }}>
-                <h4 style={{ fontSize: 13, fontWeight: 800, color: "#0f172a", margin: 0 }}>+ Tambah Obat ke Resep</h4>
-                <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1.2fr", gap: 10 }}>
-                  <input 
-                    type="text" 
-                    placeholder="Nama Obat & Dosis" 
-                    value={newMed.nama} 
-                    onChange={e => setNewMed({ ...newMed, nama: e.target.value })}
-                    style={{ padding: "8.5px 12px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: 12.5, outline: "none" }}
-                  />
-                  <input 
-                    type="text" 
-                    placeholder="Aturan Pakai" 
-                    value={newMed.dosis} 
-                    onChange={e => setNewMed({ ...newMed, dosis: e.target.value })}
-                    style={{ padding: "8.5px 12px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: 12.5, outline: "none" }}
-                  />
-                  <input 
-                    type="number" 
-                    placeholder="Jumlah" 
-                    value={newMed.jumlah} 
-                    onChange={e => setNewMed({ ...newMed, jumlah: Number(e.target.value) })}
-                    style={{ padding: "8.5px 12px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: 12.5, outline: "none" }}
-                  />
-                  <input 
-                    type="number" 
-                    placeholder="Harga Total (Rp)" 
-                    value={newMed.harga} 
-                    onChange={e => setNewMed({ ...newMed, harga: Number(e.target.value) })}
-                    style={{ padding: "8.5px 12px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: 12.5, outline: "none" }}
-                  />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", margin: 0 }}>Daftar Resep Obat Pasien</h3>
+                  <p style={{ fontSize: 12, color: "#64748b", margin: "2px 0 0" }}>
+                    Total: {prescriptions.length} Jenis Obat • Estimasi Rp {prescriptions.reduce((acc, p) => acc + (Number(p.harga) || 0), 0).toLocaleString("id-ID")}
+                  </p>
                 </div>
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <div style={{ display: "flex", gap: 8 }}>
                   <button 
-                    onClick={handleAddMedicine}
-                    style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                    + Tambahkan Obat
+                    onClick={() => syncRxToSoapPlan(prescriptions)}
+                    style={{ background: "#ea580c", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                    🔄 Sync Ke SOAP Plan (P)
+                  </button>
+                  <button 
+                    onClick={syncSoapPlanToRx}
+                    style={{ background: "#fff", color: "#0d9488", border: "1.5px solid #0d9488", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                    📥 Import Dari SOAP Plan (P)
                   </button>
                 </div>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {prescriptions.map((o, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderRadius: 12, border: "1px solid #e8f0fe", background: "#fff" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 10, background: "#e0f2fe", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <Pill style={{ width: 18, height: 18, color: "#0d9488" }} />
-                      </div>
-                      <div>
-                        <p style={{ fontSize: 13, fontWeight: 800, color: "#0f172a", margin: 0 }}>{o.nama}</p>
-                        <p style={{ fontSize: 11, color: "#64748b", margin: 0 }}>Aturan: {o.dosis}</p>
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                      <span style={{ fontSize: 12, fontWeight: 800, color: "#334155" }}>{o.jumlah} pcs</span>
-                      <span style={{ fontSize: 12, fontWeight: 800, color: "#0d9488" }}>Rp {o.harga.toLocaleString("id-ID")}</span>
-                      <button onClick={() => handleRemoveMedicine(i)} style={{ border: "none", background: "#fef2f2", color: "#dc2626", borderRadius: 6, padding: "4px 8px", cursor: "pointer" }}>✕</button>
-                    </div>
-                  </div>
-                ))}
+              {/* Quick Select Preset Obat */}
+              <div style={{ background: "#f0fdf4", padding: 14, borderRadius: 12, border: "1px solid #bbf7d0", marginBottom: 20 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 800, color: "#166534", display: "block", marginBottom: 8 }}>
+                  ⚡ Cepat Tambah Dari Katalog Obat Dokter (Klik 1x untuk Tambah):
+                </span>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {commonMedications.map((m, idx) => (
+                    <button 
+                      key={idx}
+                      onClick={() => handleAddMedicine(m)}
+                      style={{ background: "#fff", color: "#15803d", border: "1px solid #86efac", borderRadius: 8, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                      + {m.nama}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* Custom Input Form */}
+              <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1.5px solid #e2e8f0", marginBottom: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+                <h4 style={{ fontSize: 13, fontWeight: 800, color: "#0f172a", margin: 0 }}>+ Tambah Obat Manual / Custom</h4>
+                <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1.2fr", gap: 10 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 4 }}>Nama Obat & Dosis</label>
+                    <input 
+                      type="text" 
+                      placeholder="Misal: Cefadroxil 500mg" 
+                      value={newMed.nama} 
+                      onChange={e => setNewMed({ ...newMed, nama: e.target.value })}
+                      style={{ width: "100%", padding: "8.5px 12px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: 12.5, outline: "none" }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 4 }}>Aturan Pakai</label>
+                    <input 
+                      type="text" 
+                      placeholder="Misal: 3x1 sesudah makan" 
+                      value={newMed.dosis} 
+                      onChange={e => setNewMed({ ...newMed, dosis: e.target.value })}
+                      style={{ width: "100%", padding: "8.5px 12px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: 12.5, outline: "none" }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 4 }}>Jumlah (pcs)</label>
+                    <input 
+                      type="number" 
+                      placeholder="Jumlah" 
+                      value={newMed.jumlah} 
+                      onChange={e => setNewMed({ ...newMed, jumlah: Number(e.target.value) })}
+                      style={{ width: "100%", padding: "8.5px 12px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: 12.5, outline: "none" }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 4 }}>Harga Total (Rp)</label>
+                    <input 
+                      type="number" 
+                      placeholder="Harga Total (Rp)" 
+                      value={newMed.harga} 
+                      onChange={e => setNewMed({ ...newMed, harga: Number(e.target.value) })}
+                      style={{ width: "100%", padding: "8.5px 12px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: 12.5, outline: "none" }}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button 
+                    onClick={() => handleAddMedicine()}
+                    style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                    + Tambahkan Obat Ke Resep
+                  </button>
+                </div>
+              </div>
+
+              {/* Editable Prescription List */}
+              {prescriptions.length === 0 ? (
+                <div style={{ padding: 30, textAlign: "center", background: "#f8fafc", borderRadius: 12, border: "1px dashed #cbd5e1" }}>
+                  <Pill style={{ width: 32, height: 32, color: "#94a3b8", margin: "0 auto 8px" }} />
+                  <p style={{ fontSize: 13, color: "#64748b", fontWeight: 700, margin: 0 }}>Belum ada obat di dalam resep ini.</p>
+                  <p style={{ fontSize: 11.5, color: "#94a3b8", margin: "4px 0 0" }}>Gunakan katalog cepat di atas atau ketik manual untuk menambahkan obat.</p>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: "#475569" }}>Daftar Obat Terdaftar (Dapat Di-edit Dokter Realtime):</span>
+                  {prescriptions.map((o, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderRadius: 12, border: "1px solid #e2e8f0", background: "#fff", gap: 12, flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 2, minWidth: 200 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 10, background: "#e0f2fe", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <Pill style={{ width: 18, height: 18, color: "#0d9488" }} />
+                        </div>
+                        <div style={{ width: "100%" }}>
+                          <input 
+                            type="text"
+                            value={o.nama}
+                            onChange={e => handleUpdateMedicine(i, "nama", e.target.value)}
+                            style={{ fontSize: 13, fontWeight: 800, color: "#0f172a", border: "1px solid transparent", outline: "none", width: "100%", background: "transparent" }}
+                          />
+                          <input 
+                            type="text"
+                            value={o.dosis}
+                            placeholder="Aturan pakai..."
+                            onChange={e => handleUpdateMedicine(i, "dosis", e.target.value)}
+                            style={{ fontSize: 11.5, color: "#64748b", border: "1px solid #e2e8f0", borderRadius: 6, padding: "2px 6px", width: "100%", outline: "none", marginTop: 2 }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <span style={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Qty:</span>
+                          <input 
+                            type="number" 
+                            value={o.jumlah}
+                            onChange={e => handleUpdateMedicine(i, "jumlah", Number(e.target.value))}
+                            style={{ width: 55, padding: "4px 6px", borderRadius: 6, border: "1.5px solid #cbd5e1", fontSize: 12, fontWeight: 800, textAlign: "center" }}
+                          />
+                          <span style={{ fontSize: 11, color: "#64748b" }}>pcs</span>
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <span style={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Rp</span>
+                          <input 
+                            type="number" 
+                            value={o.harga}
+                            onChange={e => handleUpdateMedicine(i, "harga", Number(e.target.value))}
+                            style={{ width: 85, padding: "4px 6px", borderRadius: 6, border: "1.5px solid #cbd5e1", fontSize: 12, fontWeight: 800, color: "#0d9488" }}
+                          />
+                        </div>
+
+                        <button 
+                          onClick={() => handleRemoveMedicine(i)} 
+                          title="Hapus Obat"
+                          style={{ border: "none", background: "#fef2f2", color: "#dc2626", borderRadius: 8, padding: "6px 10px", fontWeight: 800, cursor: "pointer" }}>
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Container>
           )}
 

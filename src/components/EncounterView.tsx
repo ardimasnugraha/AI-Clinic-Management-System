@@ -411,7 +411,7 @@ const fetchPatientInfo = async (rm: string) => {
     setPrescriptions(prescriptions.filter((_, i) => i !== idx));
   };
 
-  const handleFinalizeEncounter = () => {
+  const handleFinalizeEncounter = async () => {
     if (!activePatient.name || activePatient.name === "Pilih Pasien Dari Antrean / Daftar") {
       alert("Harap pilih Pasien yang diperiksa terlebih dahulu dari dropdown di atas.");
       return;
@@ -454,9 +454,25 @@ const fetchPatientInfo = async (rm: string) => {
       const cachedBilling = localStorage.getItem("clinic_billing_v1");
       const invoices = cachedBilling ? JSON.parse(cachedBilling) : [];
       localStorage.setItem("clinic_billing_v1", JSON.stringify([invoiceItem, ...invoices]));
+
+      // Push Invoice to Supabase
+      await supabase.from("invoices").insert([{
+        clinic_id: "11111111-1111-1111-1111-111111111111",
+        invoice_no: invoiceId,
+        patient_rm: activePatient.rm,
+        patient_name: activePatient.name,
+        doctor_name: activePatient.doctor,
+        insurance: activePatient.insurance || "Umum / Bayar Sendiri",
+        date: new Date().toISOString().split("T")[0],
+        items: invoiceItem.items,
+        subtotal: totalAmount,
+        tax: 0,
+        total: totalAmount,
+        status: "Belum Bayar"
+      }]);
     } catch (e) {}
 
-    // 2. Push Prescription to Pharmacy Store
+    // 2. Push Prescription to Pharmacy Store & Supabase
     try {
       const cachedRx = localStorage.getItem("clinic_pharmacy_v1");
       const rxList = cachedRx ? JSON.parse(cachedRx) : [];
@@ -470,6 +486,18 @@ const fetchPatientInfo = async (rm: string) => {
         status: "Menunggu Penyiapan"
       };
       localStorage.setItem("clinic_pharmacy_v1", JSON.stringify([newRxOrder, ...rxList]));
+
+      // Push to Supabase
+      await supabase.from("pharmacy_orders").insert([{
+        clinic_id: "11111111-1111-1111-1111-111111111111",
+        order_no: rxId,
+        patient_rm: activePatient.rm,
+        patient_name: activePatient.name,
+        doctor_name: activePatient.doctor,
+        date: new Date().toISOString().split("T")[0],
+        medicines: prescriptions,
+        status: "Menunggu Penyiapan"
+      }]);
     } catch (e) {}
 
     // 3. Auto Order Lab if requested

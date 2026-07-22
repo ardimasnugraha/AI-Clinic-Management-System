@@ -6,6 +6,7 @@ import {
   Bell, AlertTriangle, TrendingUp, Plus, Check, X, Eye, Phone, RefreshCw, Filter, Trash2, Calendar
 } from "lucide-react";
 import { supabase, isConfigured } from "@/lib/supabase/client";
+import { logAuditEvent } from "@/lib/store";
 
 const Container = ({ style, ...p }: any) => (
   <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e8f0fe", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", ...style }} {...p} />
@@ -17,6 +18,7 @@ export interface QueueItem {
   patientId?: string;
   name: string;
   phone?: string;
+  insurance?: string;
   poli: string; // e.g. "Umum", "Gigi", "Jantung", "Mata", "Kulit", "Anak"
   doctorName?: string;
   status: "menunggu" | "dipanggil" | "selesai" | "dibatalkan";
@@ -160,54 +162,78 @@ export default function QueueView() {
     setTimeout(() => setToastMsg(null), 3500);
   };
 
-  // Load Queue Data from LocalStorage / Supabase
-  useEffect(() => {
-    const loadQueue = () => {
-      // Patients list for autocomplete
-      try {
+  // Load Queue Data from Supabase / LocalStorage
+  const loadQueue = async () => {
+    // Patients list for autocomplete
+    try {
+      const { data: pData } = await supabase.from("patients").select("*").order("full_name", { ascending: true });
+      if (pData) {
+        setRegisteredPatients(pData.map((p: any) => ({ rm: p.medical_record_number, name: p.full_name, phone: p.phone, insurance: p.insurance })));
+      } else {
         const localPatients = localStorage.getItem("clinic_patients_v1");
-        if (localPatients) {
-          setRegisteredPatients(JSON.parse(localPatients));
-        } else {
-          setRegisteredPatients([]);
-        }
-      } catch (e) {
-        console.error("Error loading patients", e);
+        if (localPatients) setRegisteredPatients(JSON.parse(localPatients));
       }
+    } catch (e) {}
 
-      // LocalStorage Queue
-      const cached = localStorage.getItem("clinic_queue_v1");
-      if (cached) {
-        try {
-          const parsed: QueueItem[] = JSON.parse(cached);
-          setQueueList(parsed);
-          const activeCalled = parsed.find((q: QueueItem) => q.status === "dipanggil");
-          if (activeCalled) {
-            setCurrentNo(activeCalled.no);
-          } else {
-            setCurrentNo("-");
-          }
-          return;
-        } catch (e) {
-          console.error("Failed parsing cached queue", e);
-        }
+    // Supabase Queue Fetch
+    try {
+      const { data, error } = await supabase
+        .from("queues")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        const mappedQueue: QueueItem[] = data.map((q: any) => ({
+          id: q.id,
+          no: q.ticket_no,
+          patientId: q.patient_id,
+          name: q.patient_name,
+          phone: q.phone,
+          insurance: q.insurance || "Umum / Bayar Sendiri",
+          poli: q.poli,
+          doctorName: q.doctor_name,
+          status: q.status,
+          wait: q.wait_time || "5-10 menit",
+          color: q.color || POLI_CONFIG[q.poli]?.color || "#0d9488",
+          date: q.date,
+          createdTime: q.created_time
+        }));
+        setQueueList(mappedQueue);
+        const activeCalled = mappedQueue.find((q: QueueItem) => q.status === "dipanggil");
+        setCurrentNo(activeCalled ? activeCalled.no : "-");
+        localStorage.setItem("clinic_queue_v1", JSON.stringify(mappedQueue));
+        return;
       }
+    } catch (e) {
+      console.warn("Failed loading queue from Supabase", e);
+    }
 
-      setQueueList([]);
-      setCurrentNo("-");
-    };
+    // LocalStorage Fallback
+    const cached = localStorage.getItem("clinic_queue_v1");
+    if (cached) {
+      try {
+        const parsed: QueueItem[] = JSON.parse(cached);
+        setQueueList(parsed);
+        const activeCalled = parsed.find((q: QueueItem) => q.status === "dipanggil");
+        setCurrentNo(activeCalled ? activeCalled.no : "-");
+        return;
+      } catch (e) {}
+    }
 
+    setQueueList([]);
+    setCurrentNo("-");
+  };
+
+  useEffect(() => {
     loadQueue();
   }, []);
 
-  // Sync state to LocalStorage
+  // Sync state to LocalStorage & Supabase
   const saveQueue = (updated: QueueItem[]) => {
     setQueueList(updated);
     try {
       localStorage.setItem("clinic_queue_v1", JSON.stringify(updated));
-    } catch (e) {
-      console.error("Failed saving queue to localStorage", e);
-    }
+    } catch (e) {}
   };
 
   // Generate Next Queue Number for a given Poli
@@ -228,7 +254,7 @@ export default function QueueView() {
   };
 
   // Call Next Patient
-  const handleNext = () => {
+  const handleNext = async () => {
     // Find next pending patient
     const nextPending = queueList.find(q => {
       const matchPoli = selPoliFilter === "Semua" || q.poli === selPoliFilter;
@@ -243,6 +269,14 @@ export default function QueueView() {
         return item;
       });
       saveQueue(updated);
+
+      try {
+        await supabase.from("queues").update({ status: "dipanggil" }).eq("ticket_no", nextPending.no);
+        if (currentNo !== "-") {
+          await supabase.from("queues").update({ status: "selesai" }).eq("ticket_no", currentNo);
+        }
+      } catch (e) {}
+
       speakCall(nextPending.no, nextPending.name, nextPending.poli);
       showToast(`Memanggil nomor antrean ${nextPending.no} (${nextPending.name})`);
     } else {
@@ -251,7 +285,7 @@ export default function QueueView() {
   };
 
   // Call Specific Patient
-  const handleCallSpecific = (item: QueueItem) => {
+  const handleCallSpecific = async (item: QueueItem) => {
     setCurrentNo(item.no);
     const updated = queueList.map(q => {
       if (q.id === item.id) return { ...q, status: "dipanggil" as const };
@@ -259,29 +293,47 @@ export default function QueueView() {
       return q;
     });
     saveQueue(updated);
+
+    try {
+      await supabase.from("queues").update({ status: "dipanggil" }).or(`ticket_no.eq.${item.no},id.eq.${item.id}`);
+      if (currentNo !== "-") {
+        await supabase.from("queues").update({ status: "selesai" }).eq("ticket_no", currentNo);
+      }
+    } catch (e) {}
+
     speakCall(item.no, item.name, item.poli);
     showToast(`Memanggil ${item.no} - ${item.name} (Poli ${item.poli})`);
   };
 
   // Complete / Check-In Current Patient
-  const handleCompleteCurrent = (noToComplete?: string) => {
+  const handleCompleteCurrent = async (noToComplete?: string) => {
     const targetNo = noToComplete || currentNo;
     const updated = queueList.map(q => q.no === targetNo ? { ...q, status: "selesai" as const, wait: "—" } : q);
     saveQueue(updated);
+
+    try {
+      await supabase.from("queues").update({ status: "selesai", wait_time: "—" }).eq("ticket_no", targetNo);
+    } catch (e) {}
+
     showToast(`Antrean ${targetNo} ditandai Selesai / Checked-In ke Dokter`);
   };
 
   // Cancel Queue Item
-  const handleCancelQueue = (id: string) => {
+  const handleCancelQueue = async (id: string) => {
     if (confirm("Apakah Anda yakin ingin membatalkan nomor antrean ini?")) {
       const updated = queueList.map(q => q.id === id ? { ...q, status: "dibatalkan" as const, wait: "—" } : q);
       saveQueue(updated);
+
+      try {
+        await supabase.from("queues").update({ status: "dibatalkan", wait_time: "—" }).or(`id.eq.${id}`);
+      } catch (e) {}
+
       showToast("Nomor antrean telah dibatalkan.");
     }
   };
 
   // Submit New Ticket Modal
-  const handleCreateTicketSubmit = (e: React.FormEvent) => {
+  const handleCreateTicketSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTicketData.name.trim()) {
       alert("Nama Pasien wajib diisi.");
@@ -291,29 +343,50 @@ export default function QueueView() {
     const poliConfig = POLI_CONFIG[newTicketData.poli] || POLI_CONFIG["Umum"];
     const nextNo = generateNextQueueNo(newTicketData.poli);
     const avatar = newTicketData.name.split(" ").map(w => w[0]).slice(0, 2).join("");
+    const createdTimeStr = getCurrentTimeStr();
 
     const newTicket: QueueItem = {
-      id: `Q${String(queueList.length + 1).padStart(3, '0')}`,
+      id: `Q-${Date.now()}`,
       no: nextNo,
       patientId: newTicketData.patientId || `RM000${Math.floor(1000 + Math.random() * 9000)}`,
       name: newTicketData.name,
       phone: newTicketData.phone || "0812-0000-0000",
+      insurance: "Umum / Bayar Sendiri",
       poli: newTicketData.poli,
       doctorName: poliConfig.doctor,
       status: "menunggu",
-      wait: "05:00",
-      avatar: avatar,
+      wait: "5-10 menit",
+      avatar,
       color: poliConfig.color,
       date: getTodayStr(),
-      createdTime: getCurrentTimeStr()
+      createdTime: createdTimeStr
     };
 
-    const updated = [...queueList, newTicket];
+    // Push to Supabase
+    try {
+      await supabase.from("queues").insert([{
+        clinic_id: "11111111-1111-1111-1111-111111111111",
+        ticket_no: nextNo,
+        patient_name: newTicketData.name,
+        phone: newTicketData.phone || "",
+        insurance: "Umum / Bayar Sendiri",
+        poli: newTicketData.poli,
+        doctor_name: poliConfig.doctor,
+        status: "menunggu",
+        wait_time: "5-10 menit",
+        color: poliConfig.color,
+        date: getTodayStr(),
+        created_time: createdTimeStr
+      }]);
+    } catch (e) {
+      console.warn("Error inserting queue ticket to Supabase", e);
+    }
+
+    const updated = [newTicket, ...queueList];
     saveQueue(updated);
     setShowAddModal(false);
     showToast(`Tiket Antrean ${nextNo} berhasil dibuat untuk ${newTicketData.name}!`);
-
-    // Show Print preview for new ticket
+    logAuditEvent("Pendaftaran Antrean Poli", "Antrean", `Pendaftaran tiket ${nextNo} Poli ${newTicketData.poli} untuk ${newTicketData.name}`);
     setShowPrintTicket(newTicket);
   };
 

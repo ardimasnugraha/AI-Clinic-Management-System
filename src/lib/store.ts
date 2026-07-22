@@ -1,4 +1,5 @@
-// Centralized Store & Persistence Layer for AI Clinic Management System
+// Centralized Store & Supabase Persistence Layer for AI Clinic Management System
+import { supabase } from "@/lib/supabase/client";
 
 export interface Doctor {
   id: string;
@@ -7,7 +8,7 @@ export interface Doctor {
   sip: string;
   phone: string;
   color: string;
-  bg: string;
+  bg?: string;
   status: "Aktif" | "Cuti" | "Nonaktif";
 }
 
@@ -94,25 +95,16 @@ export interface AuditLog {
   details: string;
 }
 
-// Initial Doctor List
-export const DEFAULT_DOCTORS: Doctor[] = [
-  { id: "DOC001", name: "dr. Maya Lestari", poli: "Umum", sip: "SIP-2024-001", phone: "0812-1111-2222", color: "#0d9488", bg: "#e0f2fe", status: "Aktif" },
-  { id: "DOC002", name: "drg. Sari Dewi", poli: "Gigi", sip: "SIP-2024-002", phone: "0812-3333-4444", color: "#8b5cf6", bg: "#ede9fe", status: "Aktif" },
-  { id: "DOC003", name: "dr. Ahmad Rizki", poli: "Jantung", sip: "SIP-2024-003", phone: "0812-5555-6666", color: "#f97316", bg: "#fff7ed", status: "Aktif" },
-  { id: "DOC004", name: "dr. Laila Rahmawati", poli: "Kulit", sip: "SIP-2024-004", phone: "0812-7777-8888", color: "#ec4899", bg: "#fdf2f8", status: "Aktif" },
-  { id: "DOC005", name: "dr. Rudi Setiawan", poli: "Anak", sip: "SIP-2024-005", phone: "0812-9999-0000", color: "#22c55e", bg: "#f0fdf4", status: "Aktif" },
-  { id: "DOC006", name: "dr. Hendra Kusuma", poli: "Mata", sip: "SIP-2024-006", phone: "0811-2233-4455", color: "#3b82f6", bg: "#eff6ff", status: "Aktif" },
-];
-
-// LocalStorage Helper Getters / Setters
+// Clean helper: Get doctors directly from Supabase / Local cache fallback
 export const getStoredDoctors = (): Doctor[] => {
-  if (typeof window === "undefined") return DEFAULT_DOCTORS;
+  if (typeof window === "undefined") return [];
   const cached = localStorage.getItem("clinic_doctors_v1");
   if (cached) {
-    try { return JSON.parse(cached); } catch (e) {}
+    try {
+      return JSON.parse(cached);
+    } catch (e) {}
   }
-  localStorage.setItem("clinic_doctors_v1", JSON.stringify(DEFAULT_DOCTORS));
-  return DEFAULT_DOCTORS;
+  return [];
 };
 
 export const saveStoredDoctors = (doctors: Doctor[]) => {
@@ -120,42 +112,79 @@ export const saveStoredDoctors = (doctors: Doctor[]) => {
   localStorage.setItem("clinic_doctors_v1", JSON.stringify(doctors));
 };
 
-export const addStoredDoctor = (doctor: Omit<Doctor, "id">): Doctor => {
+export const addStoredDoctor = async (doctor: Omit<Doctor, "id">): Promise<Doctor> => {
   const current = getStoredDoctors();
+  const nextDocId = `DOC${String(current.length + 1).padStart(3, "0")}`;
   const newDoc: Doctor = {
     ...doctor,
-    id: `DOC${String(current.length + 1).padStart(3, "0")}`
+    id: nextDocId
   };
+
+  try {
+    await supabase.from("doctor_profiles").insert([{
+      clinic_id: "11111111-1111-1111-1111-111111111111",
+      doctor_id: nextDocId,
+      full_name: newDoc.name,
+      poli: newDoc.poli,
+      sip: newDoc.sip,
+      phone: newDoc.phone,
+      color: newDoc.color,
+      status: newDoc.status
+    }]);
+  } catch (e) {
+    console.warn("Failed inserting doctor into Supabase", e);
+  }
+
   const updated = [newDoc, ...current];
   saveStoredDoctors(updated);
   logAuditEvent("Tambah Dokter Baru", "Dokter", `Menambahkan dokter ${newDoc.name} (${newDoc.poli})`);
   return newDoc;
 };
 
-export const logAuditEvent = (action: string, module: string, details: string) => {
+// Log audit event to Supabase & LocalStorage cache
+export const logAuditEvent = async (action: string, module: string, details: string, user: string = "dr. Maya Lestari") => {
   if (typeof window === "undefined") return;
+  const now = new Date();
+  const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  const timestampStr = `${now.toLocaleDateString("id-ID")} ${timeStr}`;
+  
+  const newLog: AuditLog = {
+    id: `LOG${String(Date.now()).slice(-6)}`,
+    timestamp: timestampStr,
+    user,
+    action,
+    module,
+    details
+  };
+
+  // Sync to Supabase audit_logs
+  try {
+    await supabase.from("audit_logs").insert([{
+      clinic_id: "11111111-1111-1111-1111-111111111111",
+      actor_role: user,
+      action: `${action} [${module}]`,
+      resource_type: module,
+      metadata: { details, user, timestamp: timestampStr }
+    }]);
+  } catch (e) {}
+
+  // Sync to LocalStorage cache
   try {
     const cached = localStorage.getItem("clinic_audit_logs_v1");
     const logs: AuditLog[] = cached ? JSON.parse(cached) : [];
-    const now = new Date();
-    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    const newLog: AuditLog = {
-      id: `LOG${String(logs.length + 1).padStart(4, "0")}`,
-      timestamp: `${now.toLocaleDateString('id-ID')} ${timeStr}`,
-      user: "dr. Maya Lestari",
-      action,
-      module,
-      details
-    };
     localStorage.setItem("clinic_audit_logs_v1", JSON.stringify([newLog, ...logs.slice(0, 99)]));
   } catch (e) {}
 };
 
 // Helper: Auto-complete Queue and Appointment status when Encounter is finalized
-export const completePatientEncounterSync = (patientRm: string, patientName: string) => {
+export const completePatientEncounterSync = async (patientRm: string, patientName: string) => {
   if (typeof window === "undefined") return;
   
-  // 1. Update Queue status to 'selesai'
+  // 1. Update Supabase & LocalStorage Queue status to 'selesai'
+  try {
+    await supabase.from("queues").update({ status: "selesai" }).or(`patient_name.eq.${patientName},patient_id.eq.${patientRm}`);
+  } catch (e) {}
+
   try {
     const cachedQueue = localStorage.getItem("clinic_queue_v1");
     if (cachedQueue) {
@@ -170,7 +199,11 @@ export const completePatientEncounterSync = (patientRm: string, patientName: str
     }
   } catch (e) {}
 
-  // 2. Update Appointment status to 'selesai'
+  // 2. Update Supabase & LocalStorage Appointment status to 'selesai'
+  try {
+    await supabase.from("appointments").update({ status: "Selesai" }).or(`patient_id.eq.${patientRm}`);
+  } catch (e) {}
+
   try {
     const cachedAppts = localStorage.getItem("clinic_appointments_v1");
     if (cachedAppts) {
@@ -187,18 +220,37 @@ export const completePatientEncounterSync = (patientRm: string, patientName: str
 };
 
 // Helper: Auto Push Lab Order from Encounter
-export const addLabOrderFromEncounter = (labData: { patientRm: string; patientName: string; doctorName: string; testName: string; notes?: string }) => {
+export const addLabOrderFromEncounter = async (labData: { patientRm: string; patientName: string; doctorName: string; testName: string; notes?: string }) => {
   if (typeof window === "undefined") return;
+  const labId = `LAB${String(Date.now()).slice(-4)}`;
+  const dateStr = new Date().toISOString().split("T")[0];
+
+  // Save to Supabase
+  try {
+    await supabase.from("lab_orders").insert([{
+      clinic_id: "11111111-1111-1111-1111-111111111111",
+      lab_no: labId,
+      patient_rm: labData.patientRm,
+      patient_name: labData.patientName,
+      doctor_name: labData.doctorName,
+      test_name: labData.testName,
+      date: dateStr,
+      status: "menunggu",
+      notes: labData.notes || "Order dari Encounter Dokter"
+    }]);
+  } catch (e) {}
+
+  // Save to LocalStorage cache
   try {
     const cachedLab = localStorage.getItem("clinic_lab_v1");
     const labList = cachedLab ? JSON.parse(cachedLab) : [];
     const newLab = {
-      id: `LAB${String(labList.length + 1).padStart(3, "0")}`,
+      id: labId,
       patientName: labData.patientName,
       patientRm: labData.patientRm,
       testName: labData.testName,
       doctorName: labData.doctorName,
-      date: new Date().toISOString().split("T")[0],
+      date: dateStr,
       status: "menunggu",
       notes: labData.notes || "Order dari Encounter Dokter"
     };
@@ -208,7 +260,7 @@ export const addLabOrderFromEncounter = (labData: { patientRm: string; patientNa
 };
 
 // Helper: Directly Add Queue Ticket from Patient View
-export const addQueueTicketDirect = (patient: { rm: string; name: string; phone?: string; insurance?: string }, poli: string) => {
+export const addQueueTicketDirect = async (patient: { rm: string; name: string; phone?: string; insurance?: string }, poli: string) => {
   if (typeof window === "undefined") return null;
   try {
     const cachedQueue = localStorage.getItem("clinic_queue_v1");
@@ -235,6 +287,20 @@ export const addQueueTicketDirect = (patient: { rm: string; name: string; phone?
       createdTime: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
     };
 
+    // Push to Supabase
+    try {
+      await supabase.from("queues").insert([{
+        clinic_id: "11111111-1111-1111-1111-111111111111",
+        ticket_no: ticketNo,
+        patient_name: patient.name,
+        phone: patient.phone,
+        insurance: patient.insurance || "Umum / Bayar Sendiri",
+        poli,
+        status: "menunggu",
+        wait_time: "5-10 menit"
+      }]);
+    } catch (e) {}
+
     const updated = [newTicket, ...queueList];
     localStorage.setItem("clinic_queue_v1", JSON.stringify(updated));
     logAuditEvent("Pendaftaran Antrean Poli", "Antrean", `Pendaftaran tiket ${ticketNo} Poli ${poli} untuk ${patient.name}`);
@@ -251,9 +317,11 @@ export const resetAllData = () => {
   localStorage.removeItem("clinic_queue_v1");
   localStorage.removeItem("clinic_encounters_v1");
   localStorage.removeItem("clinic_pharmacy_v1");
+  localStorage.removeItem("clinic_inventory_v1");
   localStorage.removeItem("clinic_billing_v1");
   localStorage.removeItem("clinic_lab_v1");
   localStorage.removeItem("clinic_audit_logs_v1");
-  localStorage.setItem("clinic_doctors_v1", JSON.stringify(DEFAULT_DOCTORS));
+  localStorage.removeItem("clinic_documents_v1");
+  localStorage.removeItem("clinic_doctors_v1");
   logAuditEvent("Reset System Data", "System", "Seluruh data sampel berhasil dibersihkan");
 };

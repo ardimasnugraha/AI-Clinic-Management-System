@@ -45,8 +45,32 @@ export default function SettingsView() {
     setTimeout(() => setToastMsg(null), 3500);
   };
 
+  const loadDoctors = async () => {
+    try {
+      const { data, error } = await supabase.from("doctor_profiles").select("*").order("created_at", { ascending: false });
+      if (!error && data) {
+        const mappedDocs: Doctor[] = data.map((d: any) => ({
+          id: d.doctor_id || d.id,
+          name: d.full_name,
+          poli: d.poli,
+          sip: d.sip || "SIP-2026-001",
+          phone: d.phone || "0812-0000-0000",
+          color: d.color || "#0d9488",
+          bg: d.color ? `${d.color}18` : "#e0f2fe",
+          status: d.status || "Aktif"
+        }));
+        setDoctors(mappedDocs);
+        saveStoredDoctors(mappedDocs);
+      } else {
+        setDoctors(getStoredDoctors());
+      }
+    } catch (e) {
+      setDoctors(getStoredDoctors());
+    }
+  };
+
   useEffect(() => {
-    setDoctors(getStoredDoctors());
+    loadDoctors();
 
     async function loadPatients() {
       const { data, error } = await supabase.from("patients").select("*").order("medical_record_number", { ascending: true });
@@ -100,7 +124,7 @@ export default function SettingsView() {
     setShowAddDoctorModal(true);
   };
 
-  const handleDoctorFormSubmit = (e: React.FormEvent) => {
+  const handleDoctorFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!docForm.name.trim()) {
       alert("Nama Dokter wajib diisi.");
@@ -108,7 +132,7 @@ export default function SettingsView() {
     }
 
     if (editingDoctor) {
-      // Edit existing doctor
+      // Edit existing doctor in Supabase & local
       const updated = doctors.map(d => {
         if (d.id === editingDoctor.id) {
           return {
@@ -126,10 +150,24 @@ export default function SettingsView() {
       });
       setDoctors(updated);
       saveStoredDoctors(updated);
+
+      try {
+        await supabase.from("doctor_profiles").update({
+          full_name: docForm.name,
+          poli: docForm.poli,
+          sip: docForm.sip,
+          phone: docForm.phone,
+          color: docForm.color,
+          status: docForm.status
+        }).or(`doctor_id.eq.${editingDoctor.id},id.eq.${editingDoctor.id}`);
+      } catch (e) {}
+
       showToast(`Data ${docForm.name} berhasil diperbarui.`);
     } else {
-      // Create new doctor
-      const created = addStoredDoctor({
+      // Create new doctor in Supabase & local
+      const nextDocId = `DOC${String(doctors.length + 1).padStart(3, "0")}`;
+      const newDocItem: Doctor = {
+        id: nextDocId,
         name: docForm.name,
         poli: docForm.poli,
         sip: docForm.sip || `SIP-${new Date().getFullYear()}-001`,
@@ -137,21 +175,41 @@ export default function SettingsView() {
         color: docForm.color,
         bg: `${docForm.color}18`,
         status: docForm.status
-      });
-      setDoctors(getStoredDoctors());
-      showToast(`Dokter Baru ${created.name} (${created.poli}) berhasil ditambahkan!`);
+      };
+
+      try {
+        await supabase.from("doctor_profiles").insert([{
+          clinic_id: "11111111-1111-1111-1111-111111111111",
+          doctor_id: nextDocId,
+          full_name: docForm.name,
+          poli: docForm.poli,
+          sip: newDocItem.sip,
+          phone: newDocItem.phone,
+          color: docForm.color,
+          status: docForm.status
+        }]);
+      } catch (e) {}
+
+      const updated = [newDocItem, ...doctors];
+      setDoctors(updated);
+      saveStoredDoctors(updated);
+      showToast(`Dokter Baru ${docForm.name} berhasil ditambahkan!`);
     }
 
     setShowAddDoctorModal(false);
   };
 
-  const handleDeleteDoctor = (doc: Doctor) => {
-    if (confirm(`Apakah Anda yakin ingin menghapus ${doc.name} dari daftar dokter?`)) {
-      const updated = doctors.filter(d => d.id !== doc.id);
-      setDoctors(updated);
-      saveStoredDoctors(updated);
-      showToast(`${doc.name} telah dihapus.`);
-    }
+  const handleDeleteDoctor = async (id: string, name: string) => {
+    if (!confirm(`Yakin ingin menghapus ${name} dari sistem?`)) return;
+    const updated = doctors.filter(d => d.id !== id);
+    setDoctors(updated);
+    saveStoredDoctors(updated);
+
+    try {
+      await supabase.from("doctor_profiles").delete().or(`doctor_id.eq.${id},id.eq.${id}`);
+    } catch (e) {}
+
+    showToast(`Dokter ${name} berhasil dihapus.`);
   };
 
   const handleResetDataClick = () => {
@@ -280,7 +338,7 @@ export default function SettingsView() {
                         <Edit2 style={{ width: 12, height: 12 }} /> Edit Data
                       </button>
                       <button 
-                        onClick={() => handleDeleteDoctor(doc)}
+                        onClick={() => handleDeleteDoctor(doc.id, doc.name)}
                         style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #fecaca", background: "#fef2f2", fontSize: 11.5, fontWeight: 700, color: "#dc2626", cursor: "pointer" }}>
                         <Trash2 style={{ width: 12, height: 12 }} />
                       </button>

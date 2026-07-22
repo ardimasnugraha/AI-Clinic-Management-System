@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Pill, Plus, Search, Package, AlertTriangle, CheckCircle2, Clock, TrendingDown, Check, Trash2 } from "lucide-react";
 import { logAuditEvent } from "@/lib/store";
+import { supabase } from "@/lib/supabase/client";
 
 const Container = ({ style, ...p }: any) => (
   <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e8f0fe", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", ...style }} {...p} />
@@ -28,17 +29,6 @@ export interface InventoryItem {
   color: string;
 }
 
-const DEFAULT_INVENTORY: InventoryItem[] = [
-  { id: "MED001", name: "Amoksisilin 500mg", stock: 245, min: 50, unit: "kapsul", price: 1500, color: "#0d9488" },
-  { id: "MED002", name: "Paracetamol 500mg", stock: 32, min: 50, unit: "tablet", price: 1000, color: "#ef4444" },
-  { id: "MED003", name: "Metformin 500mg", stock: 180, min: 50, unit: "tablet", price: 1200, color: "#22c55e" },
-  { id: "MED004", name: "Amlodipine 5mg / 10mg", stock: 67, min: 50, unit: "tablet", price: 1500, color: "#f97316" },
-  { id: "MED005", name: "OBH Combi Batuk", stock: 15, min: 30, unit: "botol", price: 18000, color: "#ef4444" },
-  { id: "MED006", name: "Betahistine Mesylate 6mg", stock: 120, min: 40, unit: "tablet", price: 1600, color: "#8b5cf6" },
-];
-
-const DEFAULT_ORDERS: PharmacyOrder[] = [];
-
 export default function PharmacyView() {
   const [tab, setTab] = useState<"resep" | "stok">("resep");
   const [orders, setOrders] = useState<PharmacyOrder[]>([]);
@@ -54,52 +44,89 @@ export default function PharmacyView() {
     setTimeout(() => setToastMsg(null), 3500);
   };
 
-  useEffect(() => {
-    // Load Orders
+  // Fetch Inventory and Pharmacy Orders from Supabase
+  const loadPharmacyData = async () => {
+    // 1. Fetch Inventory
     try {
-      const cachedRx = localStorage.getItem("clinic_pharmacy_v1");
-      if (cachedRx) {
-        setOrders(JSON.parse(cachedRx));
-      } else {
-        setOrders([]);
-      }
-    } catch (e) {}
+      const { data: invData, error: invErr } = await supabase
+        .from("pharmacy_inventory")
+        .select("*")
+        .order("name", { ascending: true });
 
-    // Load Inventory
-    try {
-      const cachedInv = localStorage.getItem("clinic_inventory_v1");
-      if (cachedInv) {
-        setInventory(JSON.parse(cachedInv));
+      if (!invErr && invData) {
+        const mappedInv: InventoryItem[] = invData.map((item: any) => ({
+          id: item.item_code || item.id,
+          name: item.name,
+          stock: item.stock,
+          min: item.min_stock,
+          unit: item.unit,
+          price: Number(item.price),
+          color: item.color || "#0d9488"
+        }));
+        setInventory(mappedInv);
+        localStorage.setItem("clinic_inventory_v1", JSON.stringify(mappedInv));
       } else {
-        setInventory(DEFAULT_INVENTORY);
-        localStorage.setItem("clinic_inventory_v1", JSON.stringify(DEFAULT_INVENTORY));
+        const cachedInv = localStorage.getItem("clinic_inventory_v1");
+        if (cachedInv) setInventory(JSON.parse(cachedInv));
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Error loading pharmacy inventory from Supabase", e);
+    }
+
+    // 2. Fetch Orders
+    try {
+      const { data: orderData, error: orderErr } = await supabase
+        .from("pharmacy_orders")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (!orderErr && orderData) {
+        const mappedOrders: PharmacyOrder[] = orderData.map((o: any) => ({
+          id: o.order_no || o.id,
+          patientRm: o.patient_rm,
+          patientName: o.patient_name,
+          doctorName: o.doctor_name,
+          date: o.date,
+          medicines: Array.isArray(o.medicines) ? o.medicines : [],
+          status: o.status
+        }));
+        setOrders(mappedOrders);
+        localStorage.setItem("clinic_pharmacy_v1", JSON.stringify(mappedOrders));
+      } else {
+        const cachedRx = localStorage.getItem("clinic_pharmacy_v1");
+        if (cachedRx) setOrders(JSON.parse(cachedRx));
+      }
+    } catch (e) {
+      console.warn("Error loading pharmacy orders from Supabase", e);
+    }
+  };
+
+  useEffect(() => {
+    loadPharmacyData();
   }, []);
 
-  const saveOrders = (updated: PharmacyOrder[]) => {
-    setOrders(updated);
-    try { localStorage.setItem("clinic_pharmacy_v1", JSON.stringify(updated)); } catch (e) {}
-  };
-
-  const saveInventory = (updated: InventoryItem[]) => {
-    setInventory(updated);
-    try { localStorage.setItem("clinic_inventory_v1", JSON.stringify(updated)); } catch (e) {}
-  };
-
-  const handleUpdateStatus = (id: string, newStatus: PharmacyOrder["status"]) => {
+  const handleUpdateStatus = async (id: string, newStatus: PharmacyOrder["status"]) => {
     const updated = orders.map(o => o.id === id ? { ...o, status: newStatus } : o);
-    saveOrders(updated);
+    setOrders(updated);
+    try {
+      localStorage.setItem("clinic_pharmacy_v1", JSON.stringify(updated));
+    } catch (e) {}
+
+    try {
+      await supabase.from("pharmacy_orders").update({ status: newStatus }).or(`order_no.eq.${id},id.eq.${id}`);
+    } catch (e) {}
+
     showToast(`Status Resep ${id} diubah menjadi ${newStatus}`);
     logAuditEvent("Update Status Resep Obat", "Farmasi", `Resep ${id} diubah ke ${newStatus}`);
   };
 
-  const handleAddStockSubmit = (e: React.FormEvent) => {
+  const handleAddStockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stockForm.name.trim()) return;
 
+    const nextId = `MED${String(inventory.length + 1).padStart(3, '0')}`;
     const newItem: InventoryItem = {
-      id: `MED${String(inventory.length + 1).padStart(3, '0')}`,
+      id: nextId,
       name: stockForm.name,
       stock: Number(stockForm.stock),
       min: Number(stockForm.min),
@@ -108,9 +135,31 @@ export default function PharmacyView() {
       color: "#0d9488"
     };
 
-    saveInventory([newItem, ...inventory]);
+    // Push to Supabase
+    try {
+      await supabase.from("pharmacy_inventory").insert([{
+        clinic_id: "11111111-1111-1111-1111-111111111111",
+        item_code: nextId,
+        name: stockForm.name,
+        stock: Number(stockForm.stock),
+        min_stock: Number(stockForm.min),
+        unit: stockForm.unit,
+        price: Number(stockForm.price),
+        color: "#0d9488"
+      }]);
+    } catch (e) {
+      console.warn("Failed saving stock item to Supabase", e);
+    }
+
+    const updated = [newItem, ...inventory];
+    setInventory(updated);
+    try {
+      localStorage.setItem("clinic_inventory_v1", JSON.stringify(updated));
+    } catch (e) {}
+
     setShowAddStockModal(false);
     showToast(`Obat Baru ${stockForm.name} berhasil ditambahkan ke inventaris!`);
+    logAuditEvent("Tambah Inventaris Obat", "Farmasi", `Menambahkan obat ${stockForm.name} stok ${stockForm.stock} ${stockForm.unit}`);
   };
 
   const readyCount = orders.filter(o => o.status === "Siap Diambil").length;
@@ -200,7 +249,7 @@ export default function PharmacyView() {
                 {orders.length === 0 ? (
                   <tr>
                     <td colSpan={7} style={{ textAlign: "center", padding: 36, color: "#94a3b8" }}>
-                      Belum ada resep obat masuk.
+                      Belum ada resep obat masuk dari dokter.
                     </td>
                   </tr>
                 ) : (
@@ -256,122 +305,133 @@ export default function PharmacyView() {
           </div>
         </Container>
       ) : (
-        /* Inventory Table */
         <Container style={{ overflow: "hidden" }}>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 13 }}>
               <thead>
                 <tr style={{ background: "#f8fafc" }}>
-                  {["Nama Obat", "Stok Saat Ini", "Stok Minimum", "Harga Satuan", "Status Stok", "Aksi"].map(h => (
+                  {["Kode Obat", "Nama Obat", "Stok Tersedia", "Stok Minimum", "Satuan", "Harga / Satuan", "Status Stok"].map(h => (
                     <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#64748b", borderBottom: "1px solid #e8f0fe" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {inventory.map((inv) => {
-                  const isLow = inv.stock < inv.min;
-                  return (
-                    <tr key={inv.id} style={{ borderBottom: "1px solid #f8fafc" }}>
+                {inventory.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: "center", padding: 36, color: "#94a3b8" }}>
+                      Inventaris obat kosong. Klik tombol "Tambah Inventaris Obat" untuk menambahkan data obat baru.
+                    </td>
+                  </tr>
+                ) : (
+                  inventory.map((item) => (
+                    <tr key={item.id} style={{ borderBottom: "1px solid #f8fafc" }}>
+                      <td style={{ padding: "12px 16px", color: "#0d9488", fontWeight: 800 }}>{item.id}</td>
+                      <td style={{ padding: "12px 16px", fontWeight: 700, color: "#0f172a" }}>{item.name}</td>
+                      <td style={{ padding: "12px 16px", fontWeight: 800, color: item.stock < item.min ? "#ef4444" : "#0f172a" }}>{item.stock}</td>
+                      <td style={{ padding: "12px 16px", color: "#64748b" }}>{item.min}</td>
+                      <td style={{ padding: "12px 16px", color: "#475569" }}>{item.unit}</td>
+                      <td style={{ padding: "12px 16px", fontWeight: 700, color: "#0d9488" }}>Rp {item.price.toLocaleString("id-ID")}</td>
                       <td style={{ padding: "12px 16px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <div style={{ width: 32, height: 32, borderRadius: 10, background: `${inv.color}22`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <Pill style={{ width: 16, height: 16, color: inv.color }} />
-                          </div>
-                          <span style={{ fontWeight: 800, color: "#0f172a" }}>{inv.name}</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: "12px 16px", fontSize: 15, fontWeight: 900, color: isLow ? "#ef4444" : "#0f172a" }}>
-                        {inv.stock} {inv.unit}
-                      </td>
-                      <td style={{ padding: "12px 16px", color: "#64748b" }}>{inv.min} {inv.unit}</td>
-                      <td style={{ padding: "12px 16px", fontWeight: 700, color: "#0d9488" }}>Rp {inv.price.toLocaleString("id-ID")}</td>
-                      <td style={{ padding: "12px 16px" }}>
-                        {isLow ? (
-                          <span style={{ background: "#fef2f2", color: "#dc2626", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 800, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                            <TrendingDown style={{ width: 12, height: 12 }} /> Stok Menipis
-                          </span>
-                        ) : (
-                          <span style={{ background: "#dcfce7", color: "#15803d", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 800 }}>Aman</span>
-                        )}
-                      </td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <button 
-                          onClick={() => {
-                            const addAmount = prompt(`Tambah jumlah stok untuk ${inv.name}:`, "50");
-                            if (addAmount && !isNaN(Number(addAmount))) {
-                              const updated = inventory.map(item => item.id === inv.id ? { ...item, stock: item.stock + Number(addAmount) } : item);
-                              saveInventory(updated);
-                              showToast(`Stok ${inv.name} bertambah ${addAmount} ${inv.unit}`);
-                            }
-                          }}
-                          style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", fontSize: 11.5, fontWeight: 700, color: "#334155", cursor: "pointer" }}>
-                          + Restock
-                        </button>
+                        <span style={{ 
+                          background: item.stock < item.min ? "#fef2f2" : "#f0fdf4",
+                          color: item.stock < item.min ? "#dc2626" : "#166534",
+                          borderRadius: 20, padding: "4px 12px", fontSize: 11, fontWeight: 800 
+                        }}>
+                          {item.stock < item.min ? "Menipis" : "Aman"}
+                        </span>
                       </td>
                     </tr>
-                  );
-                })}
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </Container>
       )}
 
-      {/* ADD STOCK MODAL */}
+      {/* Modal Tambah Stok Obat */}
       {showAddStockModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <Container style={{ width: 440, padding: 26 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", margin: 0 }}>Tambah Inventaris Obat</h2>
-              <button onClick={() => setShowAddStockModal(false)} style={{ border: "none", background: "#f1f5f9", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 13, color: "#64748b", fontWeight: 700 }}>✕</button>
-            </div>
-
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: "#fff", borderRadius: 24, width: "100%", maxWidth: 480, padding: 24, boxShadow: "0 25px 50px rgba(0,0,0,0.25)" }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", margin: "0 0 16px" }}>Tambah Inventaris Obat Baru</h3>
+            
             <form onSubmit={handleAddStockSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Nama Obat & Dosis *</label>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>Nama Obat & Dosis *</label>
                 <input 
-                  type="text" required value={stockForm.name} 
-                  onChange={e => setStockForm({ ...stockForm, name: e.target.value })} 
-                  placeholder="Contoh: Ibuprofen 400mg"
-                  style={{ width: "100%", padding: "9.5px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 13, outline: "none" }} 
+                  type="text" 
+                  required
+                  placeholder="Contoh: Paracetamol 500mg"
+                  value={stockForm.name} 
+                  onChange={e => setStockForm({ ...stockForm, name: e.target.value })}
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: 13 }} 
                 />
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Jumlah Stok Initial</label>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>Jumlah Stok *</label>
                   <input 
-                    type="number" required value={stockForm.stock} 
-                    onChange={e => setStockForm({ ...stockForm, stock: Number(e.target.value) })} 
-                    style={{ width: "100%", padding: "9.5px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 13, outline: "none" }} 
+                    type="number" 
+                    required
+                    min={1}
+                    value={stockForm.stock} 
+                    onChange={e => setStockForm({ ...stockForm, stock: Number(e.target.value) })}
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: 13 }} 
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Satuan</label>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>Batas Stok Minimum *</label>
                   <input 
-                    type="text" value={stockForm.unit} 
-                    onChange={e => setStockForm({ ...stockForm, unit: e.target.value })} 
-                    placeholder="tablet/kapsul/botol"
-                    style={{ width: "100%", padding: "9.5px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 13, outline: "none" }} 
+                    type="number" 
+                    required
+                    min={1}
+                    value={stockForm.min} 
+                    onChange={e => setStockForm({ ...stockForm, min: Number(e.target.value) })}
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: 13 }} 
                   />
                 </div>
               </div>
 
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Harga Satuan (Rp)</label>
-                <input 
-                  type="number" value={stockForm.price} 
-                  onChange={e => setStockForm({ ...stockForm, price: Number(e.target.value) })} 
-                  style={{ width: "100%", padding: "9.5px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 13, outline: "none" }} 
-                />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>Satuan</label>
+                  <select 
+                    value={stockForm.unit} 
+                    onChange={e => setStockForm({ ...stockForm, unit: e.target.value })}
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: 13, background: "#fff" }}>
+                    <option value="tablet">tablet</option>
+                    <option value="kapsul">kapsul</option>
+                    <option value="botol">botol</option>
+                    <option value="ampul">ampul</option>
+                    <option value="tube">tube</option>
+                    <option value="strip">strip</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>Harga Satuan (Rp) *</label>
+                  <input 
+                    type="number" 
+                    required
+                    min={0}
+                    value={stockForm.price} 
+                    onChange={e => setStockForm({ ...stockForm, price: Number(e.target.value) })}
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: 13 }} 
+                  />
+                </div>
               </div>
 
-              <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-                <button type="button" onClick={() => setShowAddStockModal(false)} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1.5px solid #e2e8f0", background: "#fff", fontSize: 13, fontWeight: 700, color: "#64748b" }}>Batal</button>
-                <button type="submit" style={{ flex: 2, padding: "10px 0", borderRadius: 10, border: "none", background: "#0d9488", color: "#fff", fontSize: 13, fontWeight: 800 }}>Simpan Obat Baru</button>
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 10 }}>
+                <button type="button" onClick={() => setShowAddStockModal(false)} style={{ padding: "10px 18px", borderRadius: 10, border: "1px solid #cbd5e1", background: "#fff", color: "#475569", fontWeight: 700, cursor: "pointer" }}>
+                  Batal
+                </button>
+                <button type="submit" style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: "#0d9488", color: "#fff", fontWeight: 700, cursor: "pointer" }}>
+                  Simpan Obat
+                </button>
               </div>
             </form>
-          </Container>
+          </div>
         </div>
       )}
     </div>

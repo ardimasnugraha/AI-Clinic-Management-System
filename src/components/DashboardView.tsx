@@ -33,15 +33,11 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
   const [todayRevenue, setTodayRevenue] = useState<number>(0);
 
   const [appointmentsList, setAppointmentsList] = useState<Array<{ time: string; name: string; type: string; status: string }>>([]);
+  const [allApptsData, setAllApptsData] = useState<any[]>([]);
 
   const [liveQueue, setLiveQueue] = useState<Array<{ no: string; name: string; service: string; time: string; status: string }>>([]);
 
-  const [doctorsList, setDoctorsList] = useState<Array<{ name: string; poli: string; time: string; count: number; initials: string; bg: string; color: string; sip?: string; phone?: string }>>([
-    { name: "dr. Maya Lestari", poli: "Dokter Umum", time: "08:00 - 15:00", count: 8, initials: "ML", bg: "#ccfbf1", color: "#0d9488", sip: "SIP-2024-001", phone: "0812-1111-2222" },
-    { name: "dr. Dimas A.", poli: "Dokter Gigi", time: "09:00 - 16:00", count: 6, initials: "DA", bg: "#e0f2fe", color: "#0284c7", sip: "SIP-2024-002", phone: "0812-3333-4444" },
-    { name: "dr. Ratna Sari", poli: "Dokter Anak", time: "10:00 - 17:00", count: 5, initials: "RS", bg: "#fce7f3", color: "#db2777", sip: "SIP-2024-003", phone: "0812-5555-6666" },
-    { name: "dr. Bagus W.", poli: "Spesialis Penyakit Dalam", time: "13:00 - 20:00", count: 7, initials: "BW", bg: "#fef3c7", color: "#d97706", sip: "SIP-2024-004", phone: "0812-7777-8888" }
-  ]);
+  const [doctorsList, setDoctorsList] = useState<Array<{ name: string; poli: string; time: string; count: number; initials: string; bg: string; color: string; sip?: string; phone?: string }>>([]);
 
   const [encounterStats, setEncounterStats] = useState({ total: 0, selesai: 0, dirujuk: 0, followUp: 0 });
   const [auditTime, setAuditTime] = useState("10:24");
@@ -51,9 +47,9 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
     async function loadSupabaseData() {
       try {
         // 1. Fetch Pasien dari Supabase
-        const { count: countP } = await supabase.from("patients").select("*", { count: "exact" });
-        if (countP !== null && countP > 0) {
-          setPatientCount(timeFilter === "Hari Ini" ? countP : timeFilter === "Minggu Ini" ? countP + 35 : countP + 120);
+        const { count: countP, data: pData } = await supabase.from("patients").select("*", { count: "exact" });
+        if (countP !== null) {
+          setPatientCount(countP);
         } else {
           const localP = localStorage.getItem("clinic_patients_v1");
           if (localP) setPatientCount(JSON.parse(localP).length);
@@ -61,10 +57,11 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
 
         // 2. Fetch Appointments dari Supabase
         const { count: countA, data: apptsData } = await supabase.from("appointments").select("*", { count: "exact" });
-        if (countA !== null && countA > 0) {
-          setTodayApptCount(timeFilter === "Hari Ini" ? countA : timeFilter === "Minggu Ini" ? countA * 5 : countA * 20);
-          if (apptsData && apptsData.length > 0) {
-            const mappedAppts = apptsData.slice(0, 4).map((a: any) => ({
+        if (countA !== null) {
+          setTodayApptCount(countA);
+          if (apptsData) {
+            setAllApptsData(apptsData);
+            const mappedAppts = apptsData.slice(0, 5).map((a: any) => ({
               time: a.duration ? a.duration.split(" - ")[0] : "08:30",
               name: a.doctor_name || "Pasien",
               type: a.poli || "Konsultasi Umum",
@@ -77,17 +74,42 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
           if (localA) {
             const parsedA = JSON.parse(localA);
             setTodayApptCount(parsedA.length);
+            setAppointmentsList(parsedA.slice(0, 5).map((a: any) => ({
+              time: a.time || "08:30",
+              name: a.patientName || a.name || "Pasien",
+              type: a.poli || "Konsultasi",
+              status: a.status || "Terjadwal"
+            })));
           }
         }
 
-        // 3. Fetch Doctors dari doctor_profiles Supabase
+        // 3. Fetch Queues & Pendapatan
+        const { data: qData } = await supabase.from("queues").select("*").eq("status", "menunggu");
+        if (qData) {
+          setActiveQueueCount(qData.length);
+          setLiveQueue(qData.map((q: any) => ({
+            no: q.ticket_no,
+            name: q.patient_name,
+            service: q.poli,
+            time: q.created_time || "09:00",
+            status: q.status
+          })));
+        }
+
+        const { data: invData } = await supabase.from("invoices").select("total").eq("status", "Lunas");
+        if (invData) {
+          const rev = invData.reduce((acc: number, curr: any) => acc + Number(curr.total || 0), 0);
+          setTodayRevenue(rev);
+        }
+
+        // 4. Fetch Doctors dari doctor_profiles Supabase
         const { data: docProfiles } = await supabase.from("doctor_profiles").select("*");
         if (docProfiles && docProfiles.length > 0) {
           const mappedDocs = docProfiles.map((d: any) => ({
             name: d.full_name,
             poli: `Dokter ${d.poli}`,
             time: "08:00 - 16:00",
-            count: Math.floor(Math.random() * 6) + 4,
+            count: 0,
             initials: d.full_name.split(" ").map((w: string) => w[0]).slice(0, 2).join(""),
             bg: d.color ? `${d.color}22` : "#e0f2fe",
             color: d.color || "#0d9488",
@@ -98,33 +120,35 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
         } else {
           const storeDocs = getStoredDoctors();
           if (storeDocs && storeDocs.length > 0) {
-            setDoctorsList(storeDocs.slice(0, 4).map(d => ({
+            setDoctorsList(storeDocs.map(d => ({
               name: d.name,
               poli: `Dokter ${d.poli}`,
               time: "08:00 - 16:00",
-              count: 6,
+              count: 0,
               initials: d.name.split(" ").map(w => w[0]).slice(0, 2).join(""),
               bg: d.bg || "#e0f2fe",
               color: d.color || "#0d9488",
               sip: d.sip,
               phone: d.phone
             })));
+          } else {
+            setDoctorsList([]);
           }
         }
 
-        // 4. Fetch Encounters dari Supabase
+        // 5. Fetch Encounters dari Supabase
         const { count: countE, data: eData } = await supabase.from("encounters").select("*", { count: "exact" });
-        if (countE !== null && countE > 0) {
-          const finished = eData ? eData.filter((e: any) => e.status === "completed").length : 86;
+        if (countE !== null) {
+          const finished = eData ? eData.filter((e: any) => e.status === "completed" || e.status === "selesai").length : 0;
           setEncounterStats({
             total: countE,
             selesai: finished,
-            dirujuk: 8,
-            followUp: Math.max(0, countE - finished - 8)
+            dirujuk: 0,
+            followUp: Math.max(0, countE - finished)
           });
         }
 
-        // 5. Fetch Audit Log Waktu Terakhir dari Supabase
+        // 6. Fetch Audit Log Waktu Terakhir dari Supabase
         const { data: logData } = await supabase.from("audit_logs").select("created_at").order("created_at", { ascending: false }).limit(1);
         if (logData && logData.length > 0) {
           const t = new Date(logData[0].created_at);
@@ -132,7 +156,7 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
         }
 
       } catch (err) {
-        console.warn("Using Supabase fallback cache:", err);
+        console.warn("Error fetching Supabase dashboard data:", err);
       }
     }
 
@@ -142,17 +166,22 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
   // Handler when clicking a day on calendar
   const handleSelectDay = (day: number) => {
     setSelectedDay(day);
-    // Shuffle appointments dynamically for demo
-    const sampleNames = ["Budi Santoso", "Siti Nurhaliza", "Andi Pratama", "Dewi Anggraini", "Rudi Hermawan", "Maya Indah"];
-    const sampleTypes = ["Konsultasi Umum", "Kontrol Hipertensi", "Cek Darah", "Flu & Batuk", "Konsultasi Gigi"];
-    const statuses = ["Selesai", "Berjalan", "Menunggu", "Terjadwal"];
-
-    setAppointmentsList([
-      { time: "08:30", name: sampleNames[(day + 1) % sampleNames.length], type: sampleTypes[(day) % sampleTypes.length], status: statuses[day % 4] },
-      { time: "09:30", name: sampleNames[(day + 2) % sampleNames.length], type: sampleTypes[(day + 1) % sampleTypes.length], status: statuses[(day + 1) % 4] },
-      { time: "10:30", name: sampleNames[(day + 3) % sampleNames.length], type: sampleTypes[(day + 2) % sampleTypes.length], status: statuses[(day + 2) % 4] },
-      { time: "11:30", name: sampleNames[(day + 4) % sampleNames.length], type: sampleTypes[(day + 3) % sampleTypes.length], status: statuses[(day + 3) % 4] }
-    ]);
+    if (allApptsData.length > 0) {
+      const filtered = allApptsData.filter((a: any) => {
+        if (!a.scheduled_time) return true;
+        const d = new Date(a.scheduled_time);
+        return d.getDate() === day;
+      });
+      if (filtered.length > 0) {
+        setAppointmentsList(filtered.map((a: any) => ({
+          time: a.duration ? a.duration.split(" - ")[0] : "08:30",
+          name: a.doctor_name || "Pasien",
+          type: a.poli || "Konsultasi Umum",
+          status: a.status === "menunggu" ? "Menunggu" : a.status === "selesai" ? "Selesai" : "Terjadwal"
+        })));
+        return;
+      }
+    }
   };
 
   return (

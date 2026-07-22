@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { FileText, Plus, Search, Download, Eye, Trash2, Printer, CheckCircle2, Check } from "lucide-react";
 import { logAuditEvent, getStoredDoctors } from "@/lib/store";
+import { supabase } from "@/lib/supabase/client";
 
 const Container = ({ style, ...p }: any) => (
   <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e8f0fe", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", ...style }} {...p} />
@@ -20,12 +21,6 @@ export interface ClinicDocument {
   color: string;
   ext: string;
 }
-
-const DEFAULT_DOCUMENTS: ClinicDocument[] = [
-  { id: "DOC001", nama: "Surat Keterangan Sakit - Budi Santoso", tipe: "Surat Sakit", ukuran: "180 KB", tgl: new Date().toISOString().split("T")[0], pasien: "Budi Santoso", dokter: "dr. Maya Lestari", detailInfo: "Istirahat selama 3 hari dari tanggal 20-22 Juli 2026 karena Hipertensi.", color: "#0d9488", ext: "PDF" },
-  { id: "DOC002", nama: "Surat Rujukan RS - Andi Pratama", tipe: "Surat Rujukan", ukuran: "240 KB", tgl: new Date().toISOString().split("T")[0], pasien: "Andi Pratama", dokter: "dr. Maya Lestari", detailInfo: "Rujukan ke Sp.PD RS Kariadi Semarang untuk penanganan lanjut.", color: "#8b5cf6", ext: "PDF" },
-  { id: "DOC003", nama: "Surat Keterangan Sehat - Dewi Sartika", tipe: "Surat Sehat", ukuran: "150 KB", tgl: new Date().toISOString().split("T")[0], pasien: "Dewi Sartika", dokter: "drg. Sari Dewi", detailInfo: "Dinyatakan sehat untuk keperluan kelengkapan dokumen kerja.", color: "#22c55e", ext: "PDF" },
-];
 
 export default function DocumentsView() {
   const [documents, setDocuments] = useState<ClinicDocument[]>([]);
@@ -50,31 +45,72 @@ export default function DocumentsView() {
     setTimeout(() => setToastMsg(null), 3500);
   };
 
-  useEffect(() => {
+  const loadDocuments = async () => {
+    // Load Patients & Doctors
     try {
-      const cached = localStorage.getItem("clinic_documents_v1");
-      if (cached) {
-        setDocuments(JSON.parse(cached));
+      const { data: pData } = await supabase.from("patients").select("*").order("full_name", { ascending: true });
+      if (pData) {
+        setRegisteredPatients(pData.map((p: any) => ({ rm: p.medical_record_number, name: p.full_name })));
       } else {
-        setDocuments(DEFAULT_DOCUMENTS);
-        localStorage.setItem("clinic_documents_v1", JSON.stringify(DEFAULT_DOCUMENTS));
+        const p = localStorage.getItem("clinic_patients_v1");
+        if (p) setRegisteredPatients(JSON.parse(p));
       }
     } catch (e) {}
 
     try {
-      const p = localStorage.getItem("clinic_patients_v1");
-      if (p) setRegisteredPatients(JSON.parse(p));
-    } catch (e) {}
+      const { data: dData } = await supabase.from("doctor_profiles").select("*");
+      if (dData && dData.length > 0) {
+        setDoctorsList(dData.map((d: any) => ({ name: d.full_name, poli: d.poli })));
+      } else {
+        setDoctorsList(getStoredDoctors());
+      }
+    } catch (e) {
+      setDoctorsList(getStoredDoctors());
+    }
 
-    setDoctorsList(getStoredDoctors());
-  }, []);
+    // Load Documents from Supabase
+    try {
+      const { data, error } = await supabase
+        .from("clinic_documents")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-  const saveDocs = (updated: ClinicDocument[]) => {
-    setDocuments(updated);
-    try { localStorage.setItem("clinic_documents_v1", JSON.stringify(updated)); } catch (e) {}
+      if (!error && data) {
+        const typeColors: Record<string, string> = {
+          "Surat Sakit": "#0d9488",
+          "Surat Rujukan": "#8b5cf6",
+          "Surat Sehat": "#22c55e",
+          "Hasil Lab": "#3b82f6",
+          "Rekam Medis": "#f97316"
+        };
+        const mapped: ClinicDocument[] = data.map((d: any) => ({
+          id: d.doc_no || d.id,
+          nama: d.nama,
+          tipe: d.tipe as any,
+          ukuran: d.ukuran || "200 KB",
+          tgl: d.tgl || new Date().toISOString().split("T")[0],
+          pasien: d.pasien,
+          dokter: d.dokter,
+          detailInfo: d.detail_info,
+          color: typeColors[d.tipe] || "#0d9488",
+          ext: d.ext || "PDF"
+        }));
+        setDocuments(mapped);
+        localStorage.setItem("clinic_documents_v1", JSON.stringify(mapped));
+      } else {
+        const cached = localStorage.getItem("clinic_documents_v1");
+        if (cached) setDocuments(JSON.parse(cached));
+      }
+    } catch (e) {
+      console.warn("Error fetching documents from Supabase", e);
+    }
   };
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    loadDocuments();
+  }, []);
+
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!docForm.pasien.trim()) {
       alert("Nama Pasien wajib diisi.");
@@ -89,12 +125,16 @@ export default function DocumentsView() {
       "Rekam Medis": "#f97316"
     };
 
+    const docId = `DOC${String(documents.length + 1).padStart(3, '0')}`;
+    const docName = `${docForm.tipe} - ${docForm.pasien}`;
+    const todayStr = new Date().toISOString().split("T")[0];
+
     const newDoc: ClinicDocument = {
-      id: `DOC${String(documents.length + 1).padStart(3, '0')}`,
-      nama: `${docForm.tipe} - ${docForm.pasien}`,
+      id: docId,
+      nama: docName,
       tipe: docForm.tipe,
       ukuran: "210 KB",
-      tgl: new Date().toISOString().split("T")[0],
+      tgl: todayStr,
       pasien: docForm.pasien,
       dokter: docForm.dokter,
       detailInfo: docForm.detailInfo,
@@ -102,28 +142,57 @@ export default function DocumentsView() {
       ext: "PDF"
     };
 
-    saveDocs([newDoc, ...documents]);
-    setShowCreateModal(false);
-    showToast(`Dokumen ${newDoc.tipe} untuk ${docForm.pasien} berhasil dibuat!`);
-    logAuditEvent("Buat Dokumen Medis", "Dokumen", `Membuat ${newDoc.nama}`);
-  };
-
-  const handleDelete = (id: string) => {
-    if (confirm("Apakah Anda yakin ingin menghapus dokumen ini?")) {
-      const updated = documents.filter(d => d.id !== id);
-      saveDocs(updated);
-      showToast("Dokumen berhasil dihapus.");
+    // Save to Supabase
+    try {
+      await supabase.from("clinic_documents").insert([{
+        clinic_id: "11111111-1111-1111-1111-111111111111",
+        doc_no: docId,
+        nama: docName,
+        tipe: docForm.tipe,
+        ukuran: "210 KB",
+        tgl: todayStr,
+        pasien: docForm.pasien,
+        dokter: docForm.dokter,
+        detail_info: docForm.detailInfo,
+        color: typeColors[docForm.tipe] || "#0d9488",
+        ext: "PDF"
+      }]);
+    } catch (e) {
+      console.warn("Failed saving document to Supabase", e);
     }
+
+    const updated = [newDoc, ...documents];
+    setDocuments(updated);
+    try { localStorage.setItem("clinic_documents_v1", JSON.stringify(updated)); } catch (e) {}
+
+    setShowCreateModal(false);
+    showToast(`Berhasil menerbitkan ${docForm.tipe} untuk ${docForm.pasien}`);
+    logAuditEvent("Terbitkan Dokumen", "Dokumen", `Menerbitkan ${docForm.tipe} untuk ${docForm.pasien}`);
   };
 
-  const filtered = documents.filter(d => 
-    (cat === "Semua" || d.tipe === cat) &&
-    (!search || d.nama.toLowerCase().includes(search.toLowerCase()) || d.pasien.toLowerCase().includes(search.toLowerCase()))
-  );
+  const handleDeleteDoc = async (id: string) => {
+    if (!confirm("Yakin menghapus dokumen ini?")) return;
+    const updated = documents.filter(d => d.id !== id);
+    setDocuments(updated);
+    try { localStorage.setItem("clinic_documents_v1", JSON.stringify(updated)); } catch (e) {}
+
+    try {
+      await supabase.from("clinic_documents").delete().or(`doc_no.eq.${id},id.eq.${id}`);
+    } catch (e) {}
+
+    showToast("Dokumen berhasil dihapus.");
+    logAuditEvent("Hapus Dokumen", "Dokumen", `Menghapus dokumen ID ${id}`);
+  };
+
+  const filtered = documents.filter(d => {
+    const matchCat = cat === "Semua" || d.tipe === cat;
+    const matchSearch = !search || d.nama.toLowerCase().includes(search.toLowerCase()) || d.pasien.toLowerCase().includes(search.toLowerCase()) || d.dokter.toLowerCase().includes(search.toLowerCase());
+    return matchCat && matchSearch;
+  });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Toast */}
+      {/* Toast Notification */}
       {toastMsg && (
         <div style={{ 
           position: "fixed", top: 24, right: 24, zIndex: 1100,
@@ -139,212 +208,202 @@ export default function DocumentsView() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#0f172a", margin: 0 }}>Modul Dokumen Medis & Surat Keterangan</h1>
-          <p style={{ fontSize: 13, color: "#64748b", margin: "2px 0 0" }}>Buat dan cetak Surat Keterangan Sakit, Surat Rujukan RS, dan Surat Sehat</p>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#0f172a", margin: 0 }}>Modul Dokumen & Surat Klinik</h1>
+          <p style={{ fontSize: 13, color: "#64748b", margin: "2px 0 0" }}>Terbitkan Surat Sakit, Surat Rujukan, Surat Sehat, & dokumen medis pasien secara resmi</p>
         </div>
 
-        <button onClick={() => setShowCreateModal(true)} style={{ display: "flex", alignItems: "center", gap: 8, background: "#0d9488", color: "#fff", border: "none", borderRadius: 12, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 12px rgba(13,148,136,0.25)" }}>
-          <Plus style={{ width: 16, height: 16 }} /> Buat Dokumen Baru
+        <button 
+          onClick={() => setShowCreateModal(true)}
+          style={{ display: "flex", alignItems: "center", gap: 8, background: "#0d9488", color: "#fff", border: "none", borderRadius: 12, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 12px rgba(13,148,136,0.25)" }}>
+          <Plus style={{ width: 16, height: 16 }} /> Terbitkan Surat / Dokumen
         </button>
       </div>
 
-      {/* Stat Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
-        {[
-          { label: "Total Dokumen Terbit", val: documents.length, color: "#0d9488", bg: "#e0f2fe" },
-          { label: "Surat Sakit", val: documents.filter(d => d.tipe === "Surat Sakit").length, color: "#8b5cf6", bg: "#ede9fe" },
-          { label: "Surat Rujukan", val: documents.filter(d => d.tipe === "Surat Rujukan").length, color: "#f97316", bg: "#fff7ed" },
-          { label: "Surat Keterangan Sehat", val: documents.filter(d => d.tipe === "Surat Sehat").length, color: "#22c55e", bg: "#f0fdf4" },
-        ].map((s, i) => (
-          <Container key={i} style={{ padding: 18 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 12, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <FileText style={{ width: 20, height: 20, color: s.color }} />
-              </div>
-              <div>
-                <p style={{ fontSize: 11, color: "#64748b", fontWeight: 600, margin: 0 }}>{s.label}</p>
-                <h3 style={{ fontSize: 24, fontWeight: 800, color: s.color, margin: 0 }}>{s.val}</h3>
-              </div>
-            </div>
-          </Container>
-        ))}
-      </div>
-
-      {/* Filter Toolbar */}
-      <Container style={{ padding: 16 }}>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-          <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
-            <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#94a3b8" }} />
-            <input 
-              value={search} 
-              onChange={e => setSearch(e.target.value)} 
-              placeholder="Cari nama dokumen atau pasien..."
-              style={{ width: "100%", paddingLeft: 34, paddingRight: 16, paddingTop: 8.5, paddingBottom: 8.5, borderRadius: 10, border: "1.5px solid #e2e8f0", background: "#f8fafc", fontSize: 12.5, outline: "none" }} 
-            />
-          </div>
-
-          {["Semua", "Surat Sakit", "Surat Rujukan", "Surat Sehat", "Hasil Lab"].map(c => (
+      {/* Filter Bar */}
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {["Semua", "Surat Sakit", "Surat Rujukan", "Surat Sehat", "Hasil Lab", "Rekam Medis"].map(c => (
             <button 
-              key={c} 
-              onClick={() => setCat(c)} 
-              style={{ 
-                padding: "7px 14px", borderRadius: 10, border: "1.5px solid", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                borderColor: cat === c ? "#0d9488" : "#e2e8f0", background: cat === c ? "#0d9488" : "#fff", color: cat === c ? "#fff" : "#64748b" 
+              key={c}
+              onClick={() => setCat(c)}
+              style={{
+                padding: "8px 16px", borderRadius: 20, border: "none", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                background: cat === c ? "#0d9488" : "#f1f5f9", color: cat === c ? "#fff" : "#64748b"
               }}>
               {c}
             </button>
           ))}
         </div>
-      </Container>
 
-      {/* Table */}
-      <Container style={{ overflow: "hidden" }}>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: "#f8fafc" }}>
-                {["Nama Dokumen", "Jenis Dokumen", "Pasien", "Dokter Penanggung Jawab", "Tanggal", "Aksi"].map(h => (
-                  <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#64748b", borderBottom: "1px solid #e8f0fe" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: 36, color: "#94a3b8" }}>
-                    Tidak ada dokumen ditemukan.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((d) => (
-                  <tr key={d.id} style={{ borderBottom: "1px solid #f8fafc" }}>
-                    <td style={{ padding: "12px 16px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div style={{ width: 34, height: 34, borderRadius: 8, background: `${d.color}22`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          <span style={{ fontSize: 9, fontWeight: 900, color: d.color }}>PDF</span>
-                        </div>
-                        <span style={{ fontWeight: 800, color: "#0f172a" }}>{d.nama}</span>
-                      </div>
-                    </td>
-                    <td style={{ padding: "12px 16px" }}>
-                      <span style={{ background: `${d.color}18`, color: d.color, borderRadius: 8, padding: "4px 10px", fontSize: 11, fontWeight: 800 }}>{d.tipe}</span>
-                    </td>
-                    <td style={{ padding: "12px 16px", fontWeight: 700, color: "#334155" }}>{d.pasien}</td>
-                    <td style={{ padding: "12px 16px", color: "#64748b" }}>{d.dokter}</td>
-                    <td style={{ padding: "12px 16px", color: "#64748b" }}>{d.tgl}</td>
-                    <td style={{ padding: "12px 16px" }}>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <button onClick={() => setViewDoc(d)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", fontSize: 11, fontWeight: 700, color: "#334155", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-                          <Eye style={{ width: 12, height: 12 }} /> Lihat
-                        </button>
-                        <button onClick={() => setViewDoc(d)} style={{ padding: "5px 10px", borderRadius: 8, border: "none", background: "#0d9488", fontSize: 11, fontWeight: 700, color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-                          <Printer style={{ width: 12, height: 12 }} /> Cetak
-                        </button>
-                        <button onClick={() => handleDelete(d.id)} style={{ padding: "5px 8px", borderRadius: 8, border: "1px solid #fecaca", background: "#fef2f2", color: "#dc2626", cursor: "pointer" }}>
-                          <Trash2 style={{ width: 12, height: 12 }} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div style={{ position: "relative", width: 260 }}>
+          <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 15, height: 15, color: "#94a3b8" }} />
+          <input 
+            type="text" 
+            placeholder="Cari dokumen, pasien, dokter..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ width: "100%", padding: "8px 14px 8px 36px", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: 12.5 }}
+          />
         </div>
-      </Container>
+      </div>
 
-      {/* CREATE DOCUMENT MODAL */}
+      {/* Document Grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+        {filtered.length === 0 ? (
+          <Container style={{ gridColumn: "1 / -1", padding: 40, textAlign: "center", color: "#94a3b8" }}>
+            <FileText style={{ width: 40, height: 40, margin: "0 auto 10px", opacity: 0.4 }} />
+            <p style={{ margin: 0, fontWeight: 600 }}>Belum ada dokumen yang diterbitkan.</p>
+          </Container>
+        ) : (
+          filtered.map(doc => (
+            <Container key={doc.id} style={{ padding: 18, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                  <span style={{ background: `${doc.color}15`, color: doc.color, padding: "4px 10px", borderRadius: 8, fontSize: 11, fontWeight: 800 }}>
+                    {doc.tipe}
+                  </span>
+                  <span style={{ fontSize: 11, color: "#94a3b8" }}>{doc.tgl}</span>
+                </div>
+
+                <h4 style={{ fontSize: 14, fontWeight: 800, color: "#0f172a", margin: "0 0 6px", lineHeight: 1.3 }}>{doc.nama}</h4>
+                <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 12px" }}>Dokter: <strong>{doc.dokter}</strong></p>
+                {doc.detailInfo && (
+                  <p style={{ fontSize: 11.5, color: "#475569", background: "#f8fafc", padding: 8, borderRadius: 8, margin: "0 0 12px", borderLeft: `3px solid ${doc.color}` }}>
+                    {doc.detailInfo}
+                  </p>
+                )}
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 12, borderTop: "1px solid #f1f5f9" }}>
+                <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700 }}>{doc.ukuran} • {doc.ext}</span>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={() => setViewDoc(doc)} title="Lihat Pratinjau" style={{ background: "#f1f5f9", border: "none", borderRadius: 8, padding: 6, cursor: "pointer", color: "#475569" }}>
+                    <Eye style={{ width: 14, height: 14 }} />
+                  </button>
+                  <button onClick={() => handleDeleteDoc(doc.id)} title="Hapus Dokumen" style={{ background: "#fef2f2", border: "none", borderRadius: 8, padding: 6, cursor: "pointer", color: "#ef4444" }}>
+                    <Trash2 style={{ width: 14, height: 14 }} />
+                  </button>
+                </div>
+              </div>
+            </Container>
+          ))
+        )}
+      </div>
+
+      {/* Modal Terbitkan Dokumen */}
       {showCreateModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <Container style={{ width: 460, padding: 26 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", margin: 0 }}>Buat Dokumen Surat Keterangan</h2>
-              <button onClick={() => setShowCreateModal(false)} style={{ border: "none", background: "#f1f5f9", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>✕</button>
-            </div>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: "#fff", borderRadius: 24, width: "100%", maxWidth: 500, padding: 24, boxShadow: "0 25px 50px rgba(0,0,0,0.25)" }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", margin: "0 0 16px" }}>Terbitkan Dokumen / Surat Medis</h3>
 
             <form onSubmit={handleCreateSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Jenis Dokumen Medis</label>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>Jenis Surat / Dokumen *</label>
                 <select 
                   value={docForm.tipe} 
                   onChange={e => setDocForm({ ...docForm, tipe: e.target.value as any })}
-                  style={{ width: "100%", padding: "9.5px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 13, outline: "none", fontWeight: 700 }}>
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: 13, background: "#fff" }}>
                   <option value="Surat Sakit">Surat Keterangan Sakit</option>
-                  <option value="Surat Rujukan">Surat Rujukan RS</option>
+                  <option value="Surat Rujukan">Surat Rujukan Rumah Sakit</option>
                   <option value="Surat Sehat">Surat Keterangan Sehat</option>
+                  <option value="Hasil Lab">Hasil Pemeriksaan Laboratorium</option>
+                  <option value="Rekam Medis">Ringkasan Rekam Medis Pasien</option>
                 </select>
               </div>
 
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Nama Pasien *</label>
-                <input 
-                  type="text" required value={docForm.pasien} 
-                  onChange={e => setDocForm({ ...docForm, pasien: e.target.value })}
-                  placeholder="Ketik nama pasien..."
-                  style={{ width: "100%", padding: "9.5px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 13, outline: "none" }} 
-                />
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>Pilih Nama Pasien *</label>
+                {registeredPatients.length > 0 ? (
+                  <select 
+                    required
+                    value={docForm.pasien} 
+                    onChange={e => setDocForm({ ...docForm, pasien: e.target.value })}
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: 13, background: "#fff" }}>
+                    <option value="">-- Pilih Pasien Terdaftar --</option>
+                    {registeredPatients.map((p, idx) => (
+                      <option key={idx} value={p.name}>{p.name} ({p.rm})</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input 
+                    type="text" 
+                    required
+                    placeholder="Nama Lengkap Pasien"
+                    value={docForm.pasien} 
+                    onChange={e => setDocForm({ ...docForm, pasien: e.target.value })}
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: 13 }} 
+                  />
+                )}
               </div>
 
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Dokter Penanggung Jawab</label>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>Dokter Penanggung Jawab</label>
                 <select 
                   value={docForm.dokter} 
                   onChange={e => setDocForm({ ...docForm, dokter: e.target.value })}
-                  style={{ width: "100%", padding: "9.5px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 13, outline: "none" }}>
-                  {doctorsList.map(d => <option key={d.id || d.name} value={d.name}>{d.name}</option>)}
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: 13, background: "#fff" }}>
+                  {doctorsList.length > 0 ? (
+                    doctorsList.map((d, idx) => (
+                      <option key={idx} value={d.name}>{d.name} ({d.poli})</option>
+                    ))
+                  ) : (
+                    <option value="dr. Maya Lestari">dr. Maya Lestari (Poli Umum)</option>
+                  )}
                 </select>
               </div>
 
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Isi Keterangan / Instruksi</label>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>Keterangan / Isi Dokumen</label>
                 <textarea 
-                  rows={3} 
-                  value={docForm.detailInfo} 
+                  rows={3}
+                  value={docForm.detailInfo}
                   onChange={e => setDocForm({ ...docForm, detailInfo: e.target.value })}
-                  style={{ width: "100%", padding: "9.5px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 13, outline: "none" }} 
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: 13, fontFamily: "inherit" }}
                 />
               </div>
 
-              <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-                <button type="button" onClick={() => setShowCreateModal(false)} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1.5px solid #e2e8f0", background: "#fff", fontSize: 13, fontWeight: 700, color: "#64748b" }}>Batal</button>
-                <button type="submit" style={{ flex: 2, padding: "10px 0", borderRadius: 10, border: "none", background: "#0d9488", color: "#fff", fontSize: 13, fontWeight: 800 }}>Terbitkan Dokumen</button>
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 10 }}>
+                <button type="button" onClick={() => setShowCreateModal(false)} style={{ padding: "10px 18px", borderRadius: 10, border: "1px solid #cbd5e1", background: "#fff", color: "#475569", fontWeight: 700, cursor: "pointer" }}>
+                  Batal
+                </button>
+                <button type="submit" style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: "#0d9488", color: "#fff", fontWeight: 700, cursor: "pointer" }}>
+                  Terbitkan Surat
+                </button>
               </div>
             </form>
-          </Container>
+          </div>
         </div>
       )}
 
-      {/* DOCUMENT PRINT PREVIEW MODAL */}
+      {/* Modal Preview Dokumen */}
       {viewDoc && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <Container style={{ width: 480, padding: 28, background: "#fff" }}>
-            <div style={{ borderBottom: "2px stroke #0f172a", paddingBottom: 14, marginBottom: 16, textAlign: "center" }}>
-              <h3 style={{ fontSize: 16, fontWeight: 900, color: "#0f172a", margin: 0 }}>Klinik Sehat Sentosa</h3>
-              <p style={{ fontSize: 10, color: "#64748b", margin: "2px 0 0" }}>Jl. Pemuda No. 45 Semarang • Telp: (024) 8899-7766</p>
-              <h4 style={{ fontSize: 14, fontWeight: 900, color: viewDoc.color || "#0d9488", margin: "12px 0 0", textTransform: "uppercase" }}>{viewDoc.tipe}</h4>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: "#fff", borderRadius: 24, width: "100%", maxWidth: 520, padding: 28, boxShadow: "0 25px 50px rgba(0,0,0,0.25)" }}>
+            <div style={{ borderBottom: `4px solid ${viewDoc.color}`, paddingBottom: 14, marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: viewDoc.color, textTransform: "uppercase" }}>KLINIK SEHAT SENTOSA</div>
+              <h3 style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", margin: "4px 0 0" }}>{viewDoc.nama}</h3>
             </div>
 
-            <div style={{ fontSize: 12.5, color: "#334155", lineHeight: 1.6, marginBottom: 20 }}>
-              <p style={{ margin: "0 0 10px" }}>Yang bertanda tangan di bawah ini menerangkan bahwa:</p>
-              <div style={{ background: "#f8fafc", padding: 12, borderRadius: 10, marginBottom: 12 }}>
-                <div><strong>Nama Pasien:</strong> {viewDoc.pasien}</div>
-                <div><strong>Tanggal Terbit:</strong> {viewDoc.tgl}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 13, color: "#334155" }}>
+              <div><strong>Nomor Dokumen:</strong> {viewDoc.id}</div>
+              <div><strong>Tanggal Terbit:</strong> {viewDoc.tgl}</div>
+              <div><strong>Nama Pasien:</strong> {viewDoc.pasien}</div>
+              <div><strong>Dokter Pemeriksa:</strong> {viewDoc.dokter}</div>
+              <div style={{ background: "#f8fafc", padding: 12, borderRadius: 10, marginTop: 8, border: "1px solid #e2e8f0" }}>
+                <strong>Keterangan Medis:</strong>
+                <p style={{ margin: "4px 0 0", color: "#475569" }}>{viewDoc.detailInfo || "Diberikan secara sah oleh klinik."}</p>
               </div>
-              <p style={{ margin: "0 0 12px" }}><strong>Keterangan Medis:</strong> {viewDoc.detailInfo || "Dinyatakan dalam kondisi sehat."}</p>
-              <p style={{ margin: 0, textAlign: "right", marginTop: 24 }}>
-                Semarang, {viewDoc.tgl}<br />
-                <strong>Dokter Pemeriksa:</strong><br /><br /><br />
-                <u>({viewDoc.dokter})</u>
-              </p>
             </div>
 
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setViewDoc(null)} style={{ flex: 1, padding: "9.5px 0", borderRadius: 10, border: "1.5px solid #cbd5e1", background: "#fff", fontSize: 12, fontWeight: 700 }}>Tutup</button>
-              <button onClick={() => window.print()} style={{ flex: 2, padding: "9.5px 0", borderRadius: 10, border: "none", background: "#0d9488", color: "#fff", fontSize: 12, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                <Printer style={{ width: 14, height: 14 }} /> Cetak PDF / Printer
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24 }}>
+              <button onClick={() => setViewDoc(null)} style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid #cbd5e1", background: "#fff", color: "#475569", fontWeight: 700, cursor: "pointer" }}>
+                Tutup
+              </button>
+              <button onClick={() => alert("Mencetak dokumen medis PDF...")} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: viewDoc.color, color: "#fff", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                <Printer style={{ width: 14, height: 14 }} /> Cetak Dokumen
               </button>
             </div>
-          </Container>
+          </div>
         </div>
       )}
     </div>

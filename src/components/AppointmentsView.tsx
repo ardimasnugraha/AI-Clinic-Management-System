@@ -207,23 +207,33 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
     loadAppointments();
   }, []);
 
-  // Filtered Appointments Array
+  // Filtered Appointments Array with Ultra-Robust Defensive Null Checking
   const filteredAppointments = useMemo(() => {
-    return appointments.filter(a => {
+    return (appointments || []).filter(a => {
+      if (!a) return false;
+      const docName = a.doctorName || "";
+      const poliName = a.poli || "";
+      const statusName = a.status || "";
+      const typeName = a.type || "";
+      const patientName = a.patientName || "";
+
       // Doctor filter
-      if (filterDoctor !== "Semua Dokter" && !a.doctorName.includes(filterDoctor.replace(/ \(.*\)/, ""))) return false;
+      if (filterDoctor !== "Semua Dokter") {
+        const cleanFilterDoc = filterDoctor.replace(/ \(.*\)/, "");
+        if (!docName.includes(cleanFilterDoc)) return false;
+      }
       // Poli filter
-      if (filterPoli !== "Semua Poli" && a.poli !== filterPoli) return false;
+      if (filterPoli !== "Semua Poli" && poliName !== filterPoli) return false;
       // Status filter
-      if (filterStatus !== "Semua Status" && a.status !== filterStatus) return false;
+      if (filterStatus !== "Semua Status" && statusName !== filterStatus) return false;
       // Type filter
-      if (filterType !== "Semua Jenis" && a.type !== filterType) return false;
+      if (filterType !== "Semua Jenis" && typeName !== filterType) return false;
       // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matchName = (a.patientName || "").toLowerCase().includes(q);
-        const matchDoc = (a.doctorName || "").toLowerCase().includes(q);
-        const matchPoli = (a.poli || "").toLowerCase().includes(q);
+        const matchName = patientName.toLowerCase().includes(q);
+        const matchDoc = docName.toLowerCase().includes(q);
+        const matchPoli = poliName.toLowerCase().includes(q);
         if (!matchName && !matchDoc && !matchPoli) return false;
       }
       return true;
@@ -310,9 +320,9 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
 
   // Perform Check-in
   const handlePerformCheckIn = (apt: AppointmentItem) => {
-    addQueueTicketDirect({ rm: "RM000123", name: apt.patientName, phone: apt.phone }, (apt.poli || "Umum").replace("Poli ", ""));
+    addQueueTicketDirect({ rm: "RM000123", name: apt.patientName || "Pasien", phone: apt.phone || "" }, (apt.poli || "Umum").replace("Poli ", ""));
     handleUpdateStatus(apt.id, "Berjalan");
-    showToast(`✅ ${apt.patientName} berhasil Check-in & masuk ke antrean ${apt.poli}!`);
+    showToast(`✅ ${apt.patientName || "Pasien"} berhasil Check-in & masuk ke antrean ${apt.poli}!`);
   };
 
   // Open empty slot modal
@@ -347,7 +357,7 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
     { day: "Min", date: "25 Mei", idx: 6 }
   ];
 
-  // Dynamic Doctor Slot Occupancy
+  // Dynamic Doctor Slot Occupancy with Ultra-Robust Null Safety
   const doctorStats = useMemo(() => {
     const docs = [
       { name: "dr. Maya Lestari", spec: "Poli Umum", max: 20 },
@@ -356,7 +366,8 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
       { name: "dr. Laila Rahmawati", spec: "Poli Kulit", max: 20 }
     ];
     return docs.map(d => {
-      const count = appointments.filter(a => a.doctorName.includes(d.name.split(" ")[1] || d.name)).length;
+      const docSub = d.name.split(" ")[1] || d.name;
+      const count = (appointments || []).filter(a => (a?.doctorName || "").includes(docSub)).length;
       const filled = Math.min(count + 5, d.max); // Base preset simulation
       const pct = Math.round((filled / d.max) * 100);
       return { ...d, filled, pct };
@@ -383,7 +394,7 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
                   <User style={{ width: 20, height: 20 }} />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: 16, fontWeight: 900, color: "#0f172a", margin: 0 }}>{selectedAptDetail.patientName}</h3>
+                  <h3 style={{ fontSize: 16, fontWeight: 900, color: "#0f172a", margin: 0 }}>{selectedAptDetail.patientName || "Pasien"}</h3>
                   <div style={{ fontSize: 11, color: "#64748b" }}>ID: {selectedAptDetail.id} • {selectedAptDetail.phone}</div>
                 </div>
               </div>
@@ -393,11 +404,11 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
             <div style={{ background: "#f8fafc", borderRadius: 14, padding: 14, display: "flex", flexDirection: "column", gap: 8, fontSize: 12, marginBottom: 18 }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ color: "#64748b" }}>Dokter Pemeriksa:</span>
-                <span style={{ fontWeight: 800, color: "#0f172a" }}>{selectedAptDetail.doctorName}</span>
+                <span style={{ fontWeight: 800, color: "#0f172a" }}>{selectedAptDetail.doctorName || "-"}</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ color: "#64748b" }}>Poli / Spesialis:</span>
-                <span style={{ fontWeight: 800, color: "#0d9488" }}>{selectedAptDetail.poli}</span>
+                <span style={{ fontWeight: 800, color: "#0d9488" }}>{selectedAptDetail.poli || "-"}</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ color: "#64748b" }}>Waktu / Tanggal:</span>
@@ -767,7 +778,7 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
                   <tr key={slotTime} style={{ borderBottom: "1px solid #f8fafc", height: 50 }}>
                     <td style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", padding: "4px" }}>{slotTime}</td>
                     {DAYS_HEADER.map(dh => {
-                      const matchedApt = filteredAppointments.find(a => a.dayIndex === dh.idx && a.time.startsWith(slotTime.slice(0, 2)));
+                      const matchedApt = filteredAppointments.find(a => a?.dayIndex === dh.idx && (a?.time || "").startsWith(slotTime.slice(0, 2)));
                       const col = matchedApt ? getTypeColor(matchedApt.type) : null;
 
                       return (
@@ -792,10 +803,10 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
                                 <span>{matchedApt.time}</span>
                               </div>
                               <div style={{ fontSize: 10.5, fontWeight: 900, color: "#0f172a", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                {matchedApt.patientName}
+                                {matchedApt.patientName || "Pasien"}
                               </div>
-                              <div style={{ fontSize: 8.5, color: "#64748b", marginTop: 1 }}>{matchedApt.doctorName}</div>
-                              <div style={{ fontSize: 8, fontWeight: 700, color: col?.text }}>{matchedApt.poli}</div>
+                              <div style={{ fontSize: 8.5, color: "#64748b", marginTop: 1 }}>{matchedApt.doctorName || "-"}</div>
+                              <div style={{ fontSize: 8, fontWeight: 700, color: col?.text }}>{matchedApt.poli || "-"}</div>
                             </div>
                           ) : (
                             <div style={{ width: "100%", height: "100%", opacity: 0.2, transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "0.2"}>
@@ -824,11 +835,11 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {appointments.filter(a => a.status === "Baru").slice(0, 5).map((apt, idx) => (
+              {(appointments || []).filter(a => a?.status === "Baru").slice(0, 5).map((apt, idx) => (
                 <div key={idx} onClick={() => setSelectedAptDetail(apt)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fafafa", padding: "8px 10px", borderRadius: 12, cursor: "pointer" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#ccfbf1", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, color: "#0d9488", fontSize: 11 }}>
-                      {(apt.patientName || "Pasien").split(" ").map(w => w[0]).slice(0, 2).join("")}
+                      {(apt?.patientName || "Pasien").split(" ").map(w => w[0]).slice(0, 2).join("")}
                     </div>
                     <div>
                       <div style={{ fontSize: 11.5, fontWeight: 800, color: "#0f172a" }}>
@@ -875,19 +886,19 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
 
             {/* Check-in / Check-out Tabs */}
             <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-              <button onClick={() => setCheckInTab("Check-in")} style={{ padding: "4px 12px", borderRadius: 8, border: "none", background: checkInTab === "Check-in" ? "#e0f2fe" : "#f1f5f9", color: checkInTab === "Check-in" ? "#0369a1" : "#64748b", fontSize: 10.5, fontWeight: 800, cursor: "pointer" }}>Check-in ({appointments.filter(a => a.status === "Menunggu" || a.status === "Baru").length})</button>
-              <button onClick={() => setCheckInTab("Check-out")} style={{ padding: "4px 12px", borderRadius: 8, border: "none", background: checkInTab === "Check-out" ? "#e0f2fe" : "#f1f5f9", color: checkInTab === "Check-out" ? "#0369a1" : "#64748b", fontSize: 10.5, fontWeight: 800, cursor: "pointer" }}>Check-out ({appointments.filter(a => a.status === "Selesai").length})</button>
+              <button onClick={() => setCheckInTab("Check-in")} style={{ padding: "4px 12px", borderRadius: 8, border: "none", background: checkInTab === "Check-in" ? "#e0f2fe" : "#f1f5f9", color: checkInTab === "Check-in" ? "#0369a1" : "#64748b", fontSize: 10.5, fontWeight: 800, cursor: "pointer" }}>Check-in ({(appointments || []).filter(a => a?.status === "Menunggu" || a?.status === "Baru").length})</button>
+              <button onClick={() => setCheckInTab("Check-out")} style={{ padding: "4px 12px", borderRadius: 8, border: "none", background: checkInTab === "Check-out" ? "#e0f2fe" : "#f1f5f9", color: checkInTab === "Check-out" ? "#0369a1" : "#64748b", fontSize: 10.5, fontWeight: 800, cursor: "pointer" }}>Check-out ({(appointments || []).filter(a => a?.status === "Selesai").length})</button>
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {appointments.filter(a => checkInTab === "Check-in" ? (a.status === "Menunggu" || a.status === "Baru") : a.status === "Selesai").slice(0, 3).map((apt, idx) => (
+              {(appointments || []).filter(a => checkInTab === "Check-in" ? (a?.status === "Menunggu" || a?.status === "Baru") : a?.status === "Selesai").slice(0, 3).map((apt, idx) => (
                 <div key={idx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fafafa", padding: "8px 10px", borderRadius: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#ede9fe", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, color: "#6d28d9", fontSize: 10 }}>
-                      {(apt.patientName || "Pasien").split(" ").map(w => w[0]).slice(0, 2).join("")}
+                      {(apt?.patientName || "Pasien").split(" ").map(w => w[0]).slice(0, 2).join("")}
                     </div>
                     <div>
-                      <div style={{ fontSize: 11.5, fontWeight: 800, color: "#0f172a" }}>{apt.patientName || "Pasien"}</div>
+                      <div style={{ fontSize: 11.5, fontWeight: 800, color: "#0f172a" }}>{apt?.patientName || "Pasien"}</div>
                       <div style={{ fontSize: 9.5, color: "#64748b" }}>{apt.time} • {apt.doctorName}</div>
                     </div>
                   </div>
@@ -946,8 +957,8 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
                   <tr key={idx} style={{ borderBottom: "1px solid #f8fafc" }}>
                     <td style={{ padding: "9px 6px", fontWeight: 800, color: "#0d9488" }}>📅 {apt.time}</td>
                     <td style={{ padding: "9px 6px", fontWeight: 800, color: "#0f172a" }}>{apt.patientName || "Pasien"}</td>
-                    <td style={{ padding: "9px 6px" }}>{apt.doctorName}</td>
-                    <td style={{ padding: "9px 6px", color: "#64748b" }}>{(apt.poli || "Poli Umum").replace("Poli ", "")}</td>
+                    <td style={{ padding: "9px 6px" }}>{apt.doctorName || "-"}</td>
+                    <td style={{ padding: "9px 6px", color: "#64748b" }}>{(apt?.poli || "Poli Umum").replace("Poli ", "")}</td>
                     <td style={{ padding: "9px 6px" }}>{apt.type}</td>
                     <td style={{ padding: "9px 6px" }}>
                       <span style={{ 
@@ -1028,7 +1039,7 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
           </div>
           <div>
             <div style={{ fontSize: 10.5, color: "#64748b", fontWeight: 700 }}>Total Appointment Hari Ini</div>
-            <div style={{ fontSize: 14, fontWeight: 900, color: "#0f172a" }}>{appointments.length} janji temu</div>
+            <div style={{ fontSize: 14, fontWeight: 900, color: "#0f172a" }}>{(appointments || []).length} janji temu</div>
           </div>
         </div>
 
@@ -1040,7 +1051,7 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
           <div>
             <div style={{ fontSize: 10.5, color: "#64748b", fontWeight: 700 }}>Selesai</div>
             <div style={{ fontSize: 14, fontWeight: 900, color: "#15803d" }}>
-              {appointments.filter(a => a.status === "Selesai").length} <span style={{ fontSize: 11, fontWeight: 600 }}>({Math.round((appointments.filter(a => a.status === "Selesai").length / (appointments.length || 1)) * 100)}%)</span>
+              {(appointments || []).filter(a => a?.status === "Selesai").length} <span style={{ fontSize: 11, fontWeight: 600 }}>({Math.round(((appointments || []).filter(a => a?.status === "Selesai").length / ((appointments || []).length || 1)) * 100)}%)</span>
             </div>
           </div>
         </div>
@@ -1053,7 +1064,7 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
           <div>
             <div style={{ fontSize: 10.5, color: "#64748b", fontWeight: 700 }}>Berjalan</div>
             <div style={{ fontSize: 14, fontWeight: 900, color: "#c2410c" }}>
-              {appointments.filter(a => a.status === "Berjalan").length} <span style={{ fontSize: 11, fontWeight: 600 }}>({Math.round((appointments.filter(a => a.status === "Berjalan").length / (appointments.length || 1)) * 100)}%)</span>
+              {(appointments || []).filter(a => a?.status === "Berjalan").length} <span style={{ fontSize: 11, fontWeight: 600 }}>({Math.round(((appointments || []).filter(a => a?.status === "Berjalan").length / ((appointments || []).length || 1)) * 100)}%)</span>
             </div>
           </div>
         </div>
@@ -1066,7 +1077,7 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
           <div>
             <div style={{ fontSize: 10.5, color: "#64748b", fontWeight: 700 }}>Menunggu</div>
             <div style={{ fontSize: 14, fontWeight: 900, color: "#d97706" }}>
-              {appointments.filter(a => a.status === "Menunggu" || a.status === "Baru").length} <span style={{ fontSize: 11, fontWeight: 600 }}>({Math.round((appointments.filter(a => a.status === "Menunggu" || a.status === "Baru").length / (appointments.length || 1)) * 100)}%)</span>
+              {(appointments || []).filter(a => a?.status === "Menunggu" || a?.status === "Baru").length} <span style={{ fontSize: 11, fontWeight: 600 }}>({Math.round(((appointments || []).filter(a => a?.status === "Menunggu" || a?.status === "Baru").length / ((appointments || []).length || 1)) * 100)}%)</span>
             </div>
           </div>
         </div>

@@ -53,7 +53,8 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
     queueNo: "-",
     doctor: "dr. Maya Lestari",
     allergies: [] as string[],
-    conditions: [] as string[]
+    conditions: [] as string[],
+    insurance: "Umum / Bayar Sendiri"
   });
 
   const [soap, setSoap] = useState({
@@ -106,7 +107,8 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
             poli: "Poli Umum",
             doctorName: "dr. Maya Lestari",
             allergies: [],
-            conditions: []
+            conditions: [],
+            insurance: p.insurance || "Umum / Bayar Sendiri"
           }));
           setRegisteredPatientsList(mapped);
         }
@@ -163,7 +165,8 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
         queueNo: foundQueue.no,
         doctor: foundQueue.doctorName || doctorsList[0]?.name || "dr. Maya Lestari",
         allergies: [],
-        conditions: []
+        conditions: [],
+        insurance: foundPatient?.insurance || "Umum / Bayar Sendiri"
       });
       showToast(`Pasien Antrean ${foundQueue.name} (${foundQueue.no}) terpilih.`);
     } else if (foundPatient) {
@@ -176,7 +179,8 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
         queueNo: "Direct",
         doctor: foundPatient.doctorName || doctorsList[0]?.name || "dr. Maya Lestari",
         allergies: foundPatient.allergies || [],
-        conditions: foundPatient.conditions || []
+        conditions: foundPatient.conditions || [],
+        insurance: foundPatient.insurance || "Umum / Bayar Sendiri"
       });
       showToast(`Pasien Terdaftar ${foundPatient.name} (${foundPatient.rm}) terpilih.`);
     }
@@ -349,7 +353,8 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
 
     // 1. Create Invoice in Billing Store
     const rxSubtotal = prescriptions.reduce((acc, p) => acc + (p.harga || 12000), 0);
-    const consultationFee = 50000;
+    const isBPJS = activePatient.insurance.toLowerCase().includes("bpjs");
+    const consultationFee = isBPJS ? 0 : 50000;
     const totalAmount = consultationFee + rxSubtotal;
 
     try {
@@ -360,7 +365,7 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
         doctorName: activePatient.doctor,
         date: new Date().toISOString().split("T")[0],
         items: [
-          { name: `Jasa Konsultasi Dokter (${activePatient.doctor})`, category: "Konsultasi", amount: consultationFee },
+          { name: `Jasa Konsultasi Dokter (${activePatient.doctor})${isBPJS ? " - BPJS" : ""}`, category: "Konsultasi", amount: consultationFee },
           ...prescriptions.map(p => ({ name: `${p.nama} (${p.jumlah} pcs)`, category: "Farmasi", amount: p.harga || 12000 }))
         ],
         subtotal: totalAmount,

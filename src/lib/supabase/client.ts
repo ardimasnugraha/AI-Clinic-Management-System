@@ -1,30 +1,18 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+"use client";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+import { createBrowserClient } from "@supabase/ssr";
 
-// Cek apakah env var sudah diatur secara riil (bukan template default)
-const isConfigured = 
-  supabaseUrl && 
-  supabaseAnonKey && 
-  supabaseUrl !== "https://your-project-ref.supabase.co" && 
-  !supabaseAnonKey.startsWith("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...");
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  "";
 
-let supabase: SupabaseClient | null = null;
-
-if (isConfigured) {
-  try {
-    supabase = createClient(supabaseUrl!, supabaseAnonKey!);
-    console.log("Supabase Client initialized successfully. Connecting to live database.");
-  } catch (error) {
-    console.error("Failed to initialize Supabase Client:", error);
-  }
-} else {
-  console.warn(
-    "Supabase credentials not configured or using placeholders. " +
-    "Aplikasi berjalan dalam Mode Simulasi Lokal (Graceful Fallback)."
-  );
+export function createClient() {
+  return createBrowserClient(supabaseUrl, supabaseAnonKey);
 }
 
-export { supabase, isConfigured };
+// Singleton for component usage
+export const supabase = createClient();
 export default supabase;
+export const isConfigured = !!(supabaseUrl && supabaseAnonKey);

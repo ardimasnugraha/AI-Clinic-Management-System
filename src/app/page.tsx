@@ -1,13 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   LayoutDashboard, Users, Calendar, Activity, 
   FlaskConical, Pill, Receipt, FileText, 
   Sparkles, ShieldCheck, Settings, Search, 
-  Bell, ChevronDown, Building2,
-  LogOut, Clock, Menu, X, MessageSquare, User
+  ChevronDown, Building2,
+  LogOut, Clock, Menu, X, User
 } from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 
 import DashboardView from "@/components/DashboardView";
 import PatientsView from "@/components/PatientsView";
@@ -42,6 +44,7 @@ const menuItems = [
 ];
 
 export default function MainPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("Dashboard");
   const [showDocMenu, setShowDocMenu] = useState(false);
   const [showBranchMenu, setShowBranchMenu] = useState(false);
@@ -51,10 +54,41 @@ export default function MainPage() {
   const [prefilledPatientForAppt, setPrefilledPatientForAppt] = useState<{ rm: string; name: string; phone: string } | null>(null);
   const [prefilledPatientForEncounter, setPrefilledPatientForEncounter] = useState<null | { rm: string; name: string }>(null);
 
+  // Auth State
+  const [sessionUser, setSessionUser] = useState<{ name: string; email: string; role: string } | null>(null);
+
   // Global Search State
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Load session
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        const meta = user.user_metadata || {};
+        const email = user.email || "";
+        const name = meta.full_name || meta.name || email.split("@")[0].replace(/\./g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase());
+        const role = meta.role || "Dokter";
+        setSessionUser({ name, email, role });
+      } else {
+        router.push("/login");
+      }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        router.push("/login");
+      } else {
+        const meta = session.user.user_metadata || {};
+        const email = session.user.email || "";
+        const name = meta.full_name || meta.name || email.split("@")[0].replace(/\./g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase());
+        setSessionUser({ name, email, role: meta.role || "Dokter" });
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [router]);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -288,33 +322,32 @@ export default function MainPage() {
             )}
           </div>
 
-          {/* User Profile dropdown (Notification badges removed) */}
+          {/* User Profile dropdown */}
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            {/* Profile */}
             <div style={{ position:"relative" }}>
               <button onClick={() => setShowDocMenu(!showDocMenu)}
                 style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 12px 6px 6px", borderRadius:16, background:"#fff", border:"1px solid #f3e8e2", cursor:"pointer" }}>
-                <div style={{ width:32, height:32, borderRadius:"50%", background:"#eff6ff", display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden" }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="10" fill="#ccfbf1" />
-                    <circle cx="12" cy="10" r="4" fill="#0ea5e9" />
-                    <path d="M6 18c0-3 3-5 6-5s6 2 6 5H6z" fill="#0ea5e9" />
-                  </svg>
+                <div style={{ width:32, height:32, borderRadius:"50%", background:"linear-gradient(135deg,#ff5a50,#0d9488)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <User style={{ width:16, height:16, color:"#fff" }} />
                 </div>
                 <div style={{ textAlign:"left", display:"none" }} className="sm:block">
-                  <div style={{ fontSize:12.5, fontWeight:750, color:"#0f172a", lineHeight:1.2 }}>dr. Maya Lestari</div>
-                  <div style={{ fontSize:10.5, color:"#64748b" }}>Dokter Umum</div>
+                  <div style={{ fontSize:12.5, fontWeight:750, color:"#0f172a", lineHeight:1.2 }}>{sessionUser?.name || "Memuat..."}</div>
+                  <div style={{ fontSize:10.5, color:"#64748b" }}>{sessionUser?.role || ""}</div>
                 </div>
                 <ChevronDown style={{ width:14, height:14, color:"#94a3b8" }} />
               </button>
               {showDocMenu && (
-                <div style={{ position:"absolute", right:0, top:"calc(100% + 8px)", width:192, background:"#fff", border:"1px solid #f3e8e2", borderRadius:16, boxShadow:"0 8px 24px rgba(243,232,226,0.3)", padding:8, zIndex:50 }}>
-                  <button onClick={() => { setShowDocMenu(false); setShowDoctorModal(true); }} style={{ width:"100%", textAlign:"left", padding:"8px 10px", borderRadius:10, border:"none", background:"none", cursor:"pointer", fontSize:12, fontWeight:600, color:"#334155" }}>Profil Dokter</button>
+                <div style={{ position:"absolute", right:0, top:"calc(100% + 8px)", width:210, background:"#fff", border:"1px solid #f3e8e2", borderRadius:16, boxShadow:"0 8px 24px rgba(0,0,0,0.1)", padding:8, zIndex:50 }}>
+                  <div style={{ padding:"8px 12px", borderBottom:"1px solid #f1f5f9", marginBottom:4 }}>
+                    <div style={{ fontSize:12.5, fontWeight:800, color:"#0f172a" }}>{sessionUser?.name}</div>
+                    <div style={{ fontSize:11, color:"#64748b" }}>{sessionUser?.email}</div>
+                  </div>
+                  <button onClick={() => { setShowDocMenu(false); setShowDoctorModal(true); }} style={{ width:"100%", textAlign:"left", padding:"8px 10px", borderRadius:10, border:"none", background:"none", cursor:"pointer", fontSize:12, fontWeight:600, color:"#334155" }}>Profil Saya</button>
                   <button onClick={() => { setShowDocMenu(false); setActiveTab("Pengaturan"); }} style={{ width:"100%", textAlign:"left", padding:"8px 10px", borderRadius:10, border:"none", background:"none", cursor:"pointer", fontSize:12, fontWeight:600, color:"#334155" }}>Pengaturan Akun</button>
                   <div style={{ height:1, background:"#f3e8e2", margin:"4px 0" }} />
-                  <button onClick={() => { setShowDocMenu(false); if (confirm("Apakah Anda yakin ingin keluar dari sesi sistem?")) alert("Anda telah keluar."); }}
+                  <button onClick={async () => { setShowDocMenu(false); await supabase.auth.signOut(); router.push("/login"); }}
                     style={{ width:"100%", textAlign:"left", padding:"8px 10px", borderRadius:10, border:"none", background:"none", cursor:"pointer", fontSize:12, fontWeight:600, color:"#dc2626", display:"flex", alignItems:"center", gap:6 }}>
-                    <LogOut style={{ width:14, height:14 }} /> Keluar
+                    <LogOut style={{ width:14, height:14 }} /> Keluar dari Sesi
                   </button>
                 </div>
               )}
@@ -335,8 +368,8 @@ export default function MainPage() {
                 <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#ccfbf1", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}>
                   <User style={{ width: 32, height: 32, color: "#0d9488" }} />
                 </div>
-                <h4 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", margin: 0 }}>dr. Maya Lestari</h4>
-                <p style={{ fontSize: 12, color: "#64748b", margin: "2px 0 0" }}>Dokter Spesialis Penyakit Dalam (Sp.PD)</p>
+                <h4 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", margin: 0 }}>{sessionUser?.name || "Memuat..."}</h4>
+                <p style={{ fontSize: 12, color: "#64748b", margin: "2px 0 0" }}>{sessionUser?.email}</p>
                 <span style={{ display: "inline-block", background: "#dcfce7", color: "#166534", padding: "3px 12px", borderRadius: 12, fontSize: 11, fontWeight: 800, marginTop: 8 }}>
                   Status: Praktik Aktif
                 </span>

@@ -91,13 +91,25 @@ body {
   box-shadow: 0 4px 14px rgba(255,107,53,0.35);
 }
 
-/* ======================== HIGH CONTRAST BLACK TEXT OVERRIDE ======================== */
-body, p, label, td, th, h1, h2, h3, h4, h5, h6 {
-  color: #000000 !important;
-}
-button, button *, a, [class*="badge-"], .sidebar-active, .sidebar-active *, [class*="status-"] {
-  color: revert !important;
+/* ======================== HIGH CONTRAST TEXT - targeted fix ======================== */
+/* Only apply to actual content areas, not UI components */
+main p, main label, main td, main th, main h1, main h2, main h3, main h4, main h5, main h6 {
+  color: #0f172a;
 }
 
+/* ======================== LOGIN / AUTH PAGE ANIMATIONS ======================== */
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.auth-left  { animation: slideInLeft  0.45s ease-out; }
+.auth-right { animation: slideInRight 0.45s ease-out; }
 
-
+/* Input focus ring override for auth forms */
+input:focus, select:focus, textarea:focus {
+  outline: none;
+}

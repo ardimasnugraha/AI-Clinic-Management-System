@@ -56,6 +56,13 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
     conditions: [] as string[],
     insurance: "Umum / Bayar Sendiri"
   });
+const fetchPatientInfo = async (rm: string) => {
+  try {
+    const { data, error } = await supabase.from("patients").select("*").eq("medical_record_number", rm).single();
+    if (!error && data) return data;
+  } catch (e) {}
+  return null;
+};
 
   const [soap, setSoap] = useState({
     S: "",
@@ -116,8 +123,8 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
     }
     loadPatients();
 
-    // Load queue list for patient selection
-    try {
+
+
       const cachedQueue = localStorage.getItem("clinic_queue_v1");
       if (cachedQueue) {
         const queueList = JSON.parse(cachedQueue);
@@ -127,18 +134,20 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
         if (!initialPatient) {
           const currentCalled = queueList.find((q: any) => q.status === "dipanggil");
           if (currentCalled) {
+            // Find patient details (including insurance) from registered patients list
+            const patientInfo = registeredPatientsList.find(p => p.rm === (currentCalled.patientId || "")) || {} as any;
             setActivePatient(prev => ({
               ...prev,
               rm: currentCalled.patientId || "RM0001236",
               name: currentCalled.name,
               poli: currentCalled.poli,
               queueNo: currentCalled.no,
-              doctor: currentCalled.doctorName || "dr. Maya Lestari"
+              doctor: currentCalled.doctorName || "dr. Maya Lestari",
+              insurance: patientInfo.insurance || "Umum / Bayar Sendiri"
             }));
           }
         }
       }
-    } catch (e) {}
 
     if (initialPatient) {
       setActivePatient(prev => ({
@@ -150,26 +159,28 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
     }
   }, [initialPatient, onClearInitialPatient]);
 
-  const handleSelectPatientAny = (rmOrName: string) => {
+  const handleSelectPatientAny = async (rmOrName: string) => {
     if (!rmOrName) return;
     const foundQueue = waitingQueueList.find(q => (q.patientId === rmOrName || q.name === rmOrName));
     const foundPatient = registeredPatientsList.find(p => (p.rm === rmOrName || p.name === rmOrName));
 
     if (foundQueue) {
-      setActivePatient({
-        rm: foundQueue.patientId || `RM000${Math.floor(1000 + Math.random() * 9000)}`,
-        name: foundQueue.name,
-        gender: "Laki-laki",
-        age: 35,
-        poli: foundQueue.poli,
-        queueNo: foundQueue.no,
-        doctor: foundQueue.doctorName || doctorsList[0]?.name || "dr. Maya Lestari",
-        allergies: [],
-        conditions: [],
-        insurance: foundPatient?.insurance || "Umum / Bayar Sendiri"
-      });
-      showToast(`Pasien Antrean ${foundQueue.name} (${foundQueue.no}) terpilih.`);
-    } else if (foundPatient) {
+        // Retrieve patient info (including insurance) from Supabase if not in list
+        const patientInfo = await fetchPatientInfo(foundQueue.patientId || "");
+        setActivePatient({
+          rm: foundQueue.patientId || `RM000${Math.floor(1000 + Math.random() * 9000)}`,
+          name: foundQueue.name,
+          gender: "Laki-laki",
+          age: 35,
+          poli: foundQueue.poli,
+          queueNo: foundQueue.no,
+          doctor: foundQueue.doctorName || doctorsList[0]?.name || "dr. Maya Lestari",
+          allergies: [],
+          conditions: [],
+          insurance: patientInfo?.insurance || "Umum / Bayar Sendiri"
+        });
+        showToast(`Pasien Antrean ${foundQueue.name} (${foundQueue.no}) terpilih.`);
+      } else if (foundPatient) {
       setActivePatient({
         rm: foundPatient.rm,
         name: foundPatient.name,

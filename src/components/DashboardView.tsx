@@ -102,38 +102,45 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
           setTodayRevenue(rev);
         }
 
-        // 4. Fetch Doctors dari doctor_profiles Supabase
+        // 4. Fetch Doctors & Hitung Slot Pasien Terdaftar dari Supabase
         const { data: docProfiles } = await supabase.from("doctor_profiles").select("*");
-        if (docProfiles && docProfiles.length > 0) {
-          const mappedDocs = docProfiles.map((d: any) => ({
-            name: d.full_name,
-            poli: `Dokter ${d.poli}`,
-            time: "08:00 - 16:00",
-            count: 0,
-            initials: d.full_name.split(" ").map((w: string) => w[0]).slice(0, 2).join(""),
-            bg: d.color ? `${d.color}22` : "#e0f2fe",
-            color: d.color || "#0d9488",
-            sip: d.sip || "SIP-2026-001",
-            phone: d.phone || "0812-0000-0000"
-          }));
+        const allDocs = (docProfiles && docProfiles.length > 0) 
+          ? docProfiles.map((d: any) => ({ name: d.full_name, poli: d.poli, color: d.color, sip: d.sip, phone: d.phone }))
+          : getStoredDoctors();
+
+        if (allDocs && allDocs.length > 0) {
+          const mappedDocs = allDocs.map((d: any) => {
+            const docName = d.name || d.full_name;
+            const docSub = docName.split(" ")[1] || docName;
+            const cleanPoli = (d.poli || "").replace("Dokter ", "").replace("Poli ", "").toLowerCase();
+
+            const aptCount = (apptsData || []).filter((a: any) => {
+              const matchDoc = (a.doctor_name || "").toLowerCase().includes(docSub.toLowerCase());
+              const matchPoli = (a.poli || "").toLowerCase().includes(cleanPoli);
+              return matchDoc || matchPoli;
+            }).length;
+
+            const qCount = (qData || []).filter((q: any) => {
+              const matchDoc = (q.doctor_name || "").toLowerCase().includes(docSub.toLowerCase());
+              const matchPoli = (q.poli || "").toLowerCase().includes(cleanPoli);
+              return matchDoc || matchPoli;
+            }).length;
+
+            return {
+              name: docName,
+              poli: d.poli.startsWith("Dokter") ? d.poli : `Dokter ${d.poli}`,
+              time: "08:00 - 16:00",
+              count: aptCount + qCount,
+              initials: docName.split(" ").map((w: string) => w[0]).slice(0, 2).join(""),
+              bg: d.color ? `${d.color}22` : "#e0f2fe",
+              color: d.color || "#0d9488",
+              sip: d.sip || "SIP-2026-001",
+              phone: d.phone || "0812-0000-0000"
+            };
+          });
           setDoctorsList(mappedDocs);
         } else {
-          const storeDocs = getStoredDoctors();
-          if (storeDocs && storeDocs.length > 0) {
-            setDoctorsList(storeDocs.map(d => ({
-              name: d.name,
-              poli: `Dokter ${d.poli}`,
-              time: "08:00 - 16:00",
-              count: 0,
-              initials: d.name.split(" ").map(w => w[0]).slice(0, 2).join(""),
-              bg: d.bg || "#e0f2fe",
-              color: d.color || "#0d9488",
-              sip: d.sip,
-              phone: d.phone
-            })));
-          } else {
-            setDoctorsList([]);
-          }
+          setDoctorsList([]);
         }
 
         // 5. Fetch Encounters dari Supabase

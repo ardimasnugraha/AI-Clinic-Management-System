@@ -57,6 +57,8 @@ const DEFAULT_APPOINTMENTS: AppointmentItem[] = [];
 
 export default function AppointmentsView({ initialPatient, onClearInitialPatient, onNavigateTab }: AppointmentsViewProps) {
   const [appointments, setAppointments] = useState<AppointmentItem[]>(DEFAULT_APPOINTMENTS);
+  const [doctorsList, setDoctorsList] = useState<any[]>([]);
+  const [queueList, setQueueList] = useState<any[]>([]);
   const [viewMode, setViewMode] = useState<"Mingguan" | "Harian">("Mingguan");
   const [checkInTab, setCheckInTab] = useState<"Check-in" | "Check-out">("Check-in");
 
@@ -147,9 +149,32 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
     }
   }, [initialPatient]);
 
-  // Fetch Appointments from Supabase & LocalStorage
+  // Fetch Appointments, Doctors, & Queues from Supabase & LocalStorage
   useEffect(() => {
-    async function loadAppointments() {
+    async function loadAllData() {
+      // 1. Load Doctors
+      try {
+        const { data: dData } = await supabase.from("doctor_profiles").select("*");
+        if (dData && dData.length > 0) {
+          setDoctorsList(dData);
+        }
+      } catch (e) {}
+
+      // 2. Load Queues
+      try {
+        const { data: qData } = await supabase.from("queues").select("*");
+        if (qData) {
+          setQueueList(qData);
+        } else {
+          const localQ = localStorage.getItem("clinic_queue_v1");
+          if (localQ) setQueueList(JSON.parse(localQ));
+        }
+      } catch (e) {
+        const localQ = localStorage.getItem("clinic_queue_v1");
+        if (localQ) setQueueList(JSON.parse(localQ));
+      }
+
+      // 3. Load Appointments
       try {
         const { data } = await supabase.from("appointments").select("*").order("created_at", { ascending: false });
         if (data && data.length > 0) {
@@ -176,7 +201,7 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
         console.warn("Using fallback appointments data:", err);
       }
     }
-    loadAppointments();
+    loadAllData();
   }, []);
 
   // Filtered Appointments Array with Ultra-Robust Defensive Null Checking
@@ -329,22 +354,47 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
     { day: "Min", date: "25 Mei", idx: 6 }
   ];
 
-  // Dynamic Doctor Slot Occupancy with Ultra-Robust Null Safety
+  // Dynamic Doctor Slot Occupancy computed directly from Appointments & Queue Tickets (100% Real DB Sync)
   const doctorStats = useMemo(() => {
-    const docs = [
+    const baseDocs = doctorsList.length > 0 ? doctorsList.map((d: any) => ({
+      name: d.full_name || d.name,
+      spec: d.poli ? (d.poli.startsWith("Poli") ? d.poli : `Poli ${d.poli}`) : "Poli Umum",
+      max: 20
+    })) : [
       { name: "dr. Maya Lestari", spec: "Poli Umum", max: 20 },
       { name: "drg. Sari Dewi", spec: "Poli Gigi", max: 20 },
       { name: "dr. Ahmad Rizki", spec: "Poli Jantung", max: 20 },
       { name: "dr. Laila Rahmawati", spec: "Poli Kulit", max: 20 }
     ];
-    return docs.map(d => {
+
+    return baseDocs.slice(0, 6).map(d => {
       const docSub = d.name.split(" ")[1] || d.name;
-      const count = (appointments || []).filter(a => (a?.doctorName || "").includes(docSub)).length;
-      const filled = Math.min(count + 5, d.max); // Base preset simulation
+      const cleanPoli = d.spec.replace("Poli ", "").toLowerCase();
+
+      // 1. Appointments count for this doctor or poli
+      const aptCount = (appointments || []).filter(a => {
+        if (!a) return false;
+        const matchDoc = (a.doctorName || "").toLowerCase().includes(docSub.toLowerCase());
+        const matchPoli = (a.poli || "").toLowerCase().includes(cleanPoli);
+        return matchDoc || matchPoli;
+      }).length;
+
+      // 2. Queue tickets count for this doctor or poli
+      const queueCount = (queueList || []).filter(q => {
+        if (!q) return false;
+        const matchDoc = (q.doctorName || q.doctor_name || "").toLowerCase().includes(docSub.toLowerCase());
+        const matchPoli = (q.poli || "").toLowerCase().includes(cleanPoli);
+        const isNotCancelled = q.status !== "dibatalkan";
+        return (matchDoc || matchPoli) && isNotCancelled;
+      }).length;
+
+      const realTotalSlots = aptCount + queueCount;
+      const filled = Math.min(realTotalSlots, d.max); // Exactly start from 0, +1 per registered patient!
       const pct = Math.round((filled / d.max) * 100);
+
       return { ...d, filled, pct };
     });
-  }, [appointments]);
+  }, [appointments, queueList, doctorsList]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: "Inter, system-ui, sans-serif" }}>

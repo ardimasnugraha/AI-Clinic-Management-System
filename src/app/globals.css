@@ -11,7 +11,8 @@
   --border-color: #f3e8e2;
 }
 
-@theme inline {
+/* Custom design tokens */
+:root {
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   

@@ -52,7 +52,7 @@ export default function MainPage() {
   const [selectedBranch, setSelectedBranch] = useState("Klinik Sehat Sentosa - Cabang Semarang");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [prefilledPatientForAppt, setPrefilledPatientForAppt] = useState<{ rm: string; name: string; phone: string } | null>(null);
-  const [prefilledPatientForEncounter, setPrefilledPatientForEncounter] = useState<null | { rm: string; name: string }>(null);
+  const [prefilledPatientForEncounter, setPrefilledPatientForEncounter] = useState<null | { rm: string; name: string; insurance?: string }>(null);
 
   // Auth State
   const [sessionUser, setSessionUser] = useState<{ name: string; email: string; role: string } | null>(null);
@@ -102,7 +102,7 @@ export default function MainPage() {
     "Klinik Sehat Sentosa - Cabang Bandung Kota"
   ];
 
-  const handleStartEncounter = (patient: { rm: string; name: string }) => {
+  const handleStartEncounter = (patient: { rm: string; name: string; insurance?: string }) => {
     setActiveTab("Encounter");
     setPrefilledPatientForEncounter(patient);
   };

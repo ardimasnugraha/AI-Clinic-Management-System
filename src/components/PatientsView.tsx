@@ -32,7 +32,7 @@ export interface PatientItem {
 
 interface PatientsViewProps {
   onMakeAppointment?: (patient: { rm: string; name: string; phone: string }) => void;
-  onStartEncounter?: (patient: { rm: string; name: string }) => void;
+  onStartEncounter?: (patient: { rm: string; name: string; insurance?: string }) => void;
 }
 
 // No default patients defined (removed dummy data)
@@ -85,42 +85,55 @@ export default function PatientsView({ onMakeAppointment, onStartEncounter }: Pa
   // Fetch Patients from Supabase & LocalStorage
   useEffect(() => {
     async function loadPatients() {
+      let mapped: PatientItem[] = [];
       try {
         const { data, error } = await supabase.from("patients").select("*").order("created_at", { ascending: false });
         if (data && data.length > 0) {
-          const mapped: PatientItem[] = data.map((p: any) => ({
+          mapped = data.map((p: any) => ({
             rm: p.medical_record_number || `RM${String(Math.floor(Math.random()*9000)+1000)}`,
             name: p.full_name,
-            nik: p.nik || "3175071505960001",
-            dob: p.date_of_birth ? new Date(p.date_of_birth).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' }) : "15 Mei 1996",
+            nik: p.nik || "-",
+            dob: p.date_of_birth ? new Date(p.date_of_birth).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' }) : "-",
             gender: p.sex_at_birth || "Laki-laki",
-            phone: p.phone || "0812-3456-7890",
-            email: `${p.full_name.toLowerCase().replace(/\s+/g, ".")}@mail.com`,
-            address: "Semarang, Jawa Tengah",
+            phone: p.phone || "-",
+            email: p.email || `${p.full_name.toLowerCase().replace(/\s+/g, ".")}@mail.com`,
+            address: p.address || "-",
             status: p.status === "active" || p.status === "Aktif" ? "Aktif" : "Tidak Aktif",
             religion: p.religion || "Islam",
             age: p.date_of_birth ? new Date().getFullYear() - new Date(p.date_of_birth).getFullYear() : 29,
-            insurance: "BPJS Kesehatan - Aktif",
-            insuranceNo: "0001234567890",
-            emergencyContact: { name: "Ibu Siti Aminah", relation: "Ibu", phone: "0812-1111-2222" },
-            allergies: ["Alergi debu"],
-            privacyConsent: "Disetujui pada 10 Jan 2025",
-            prefComm: "WhatsApp, Email"
+            insurance: p.insurance || "Umum / Bayar Sendiri",
+            insuranceNo: p.insurance_no || "-",
+            emergencyContact: p.emergency_contact || { name: "-", relation: "-", phone: p.phone || "-" },
+            allergies: p.allergies || [],
+            privacyConsent: "Disetujui saat pendaftaran",
+            prefComm: "WhatsApp"
           }));
-          setPatients(mapped);
-          if (mapped.length > 0) setSelectedPatient(mapped[0]);
-        } else {
-          // Check LocalStorage
-          const localData = localStorage.getItem("clinic_patients_v1");
-          if (localData) {
-            const parsed = JSON.parse(localData);
-            setPatients(parsed);
-            if (parsed.length > 0) setSelectedPatient(parsed[0]);
-          }
         }
       } catch (e) {
-        console.warn("Using fallback patients data:", e);
+        console.warn("Error fetching patients from Supabase:", e);
       }
+
+      // Merge with LocalStorage patients to ensure no newly registered patient is lost
+      try {
+        const localData = localStorage.getItem("clinic_patients_v1");
+        if (localData) {
+          const localPatients: PatientItem[] = JSON.parse(localData);
+          localPatients.forEach(lp => {
+            if (!mapped.some(p => p.rm === lp.rm || p.name.toLowerCase() === lp.name.toLowerCase())) {
+              mapped.push(lp);
+            } else {
+              // Update insurance info from local record if present
+              const existing = mapped.find(p => p.rm === lp.rm || p.name.toLowerCase() === lp.name.toLowerCase());
+              if (existing && lp.insurance) {
+                existing.insurance = lp.insurance;
+              }
+            }
+          });
+        }
+      } catch (e) {}
+
+      setPatients(mapped);
+      if (mapped.length > 0) setSelectedPatient(mapped[0]);
     }
     loadPatients();
   }, []);
@@ -175,21 +188,21 @@ export default function PatientsView({ onMakeAppointment, onStartEncounter }: Pa
     const createdItem: PatientItem = {
       rm: newRm,
       name: newPatient.name,
-      nik: newPatient.nik || `3175${Math.floor(100000000000 + Math.random() * 900000000000)}`,
-      dob: newPatient.dob ? new Date(newPatient.dob).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' }) : "10 Jan 2000",
+      nik: newPatient.nik || "-",
+      dob: newPatient.dob ? new Date(newPatient.dob).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' }) : "-",
       gender: newPatient.gender,
-      phone: newPatient.phone || "0812-0000-0000",
+      phone: newPatient.phone || "-",
       email: newPatient.email || `${newPatient.name.toLowerCase().replace(/\s+/g, ".")}@mail.com`,
-      address: newPatient.address || "Semarang, Jawa Tengah",
+      address: newPatient.address || "-",
       status: "Aktif",
       religion: "Islam",
       age: calculatedAge,
-      insurance: `${newPatient.insurance} - Aktif`,
-      insuranceNo: "0001122334455",
-      emergencyContact: { name: "Keluarga Pasien", relation: "Kerabat", phone: newPatient.phone || "0812-0000-0000" },
-      allergies: ["Tidak ada"],
+      insurance: newPatient.insurance || "Umum / Bayar Sendiri",
+      insuranceNo: newPatient.insurance?.includes("BPJS") ? `000${Math.floor(1000000000 + Math.random() * 9000000000)}` : "-",
+      emergencyContact: { name: "-", relation: "-", phone: newPatient.phone || "-" },
+      allergies: [],
       privacyConsent: "Disetujui saat pendaftaran",
-      prefComm: "WhatsApp, SMS"
+      prefComm: "WhatsApp"
     };
 
     // Save to Supabase if configured
@@ -203,6 +216,9 @@ export default function PatientsView({ onMakeAppointment, onStartEncounter }: Pa
           sex_at_birth: newPatient.gender,
           phone: newPatient.phone,
           nik: newPatient.nik,
+          email: newPatient.email,
+          address: newPatient.address,
+          insurance: newPatient.insurance,
           status: "active"
         }]);
       } catch (err) {}
@@ -225,7 +241,7 @@ export default function PatientsView({ onMakeAppointment, onStartEncounter }: Pa
 
   // Add Queue Ticket
   const handleCreateQueue = (p: PatientItem) => {
-    addQueueTicketDirect({ rm: p.rm, name: p.name, phone: p.phone }, "Umum");
+    addQueueTicketDirect({ rm: p.rm, name: p.name, phone: p.phone, insurance: p.insurance }, "Umum");
     showToast(`🎫 Berhasil membuat tiket antrean Poli Umum untuk ${p.name}`);
     setActiveMenuRm(null);
   };
@@ -487,7 +503,7 @@ export default function PatientsView({ onMakeAppointment, onStartEncounter }: Pa
                               <button onClick={() => handleCreateQueue(p)} style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "none", background: "none", cursor: "pointer", fontSize: 11.5, fontWeight: 700, color: "#0f172a", display: "flex", alignItems: "center", gap: 6 }}>
                                 🎫 Buat Antrean Poli
                               </button>
-                              <button onClick={() => { setActiveMenuRm(null); onStartEncounter?.({ rm: p.rm, name: p.name }); }} style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "none", background: "none", cursor: "pointer", fontSize: 11.5, fontWeight: 700, color: "#0f172a", display: "flex", alignItems: "center", gap: 6 }}>
+                              <button onClick={() => { setActiveMenuRm(null); onStartEncounter?.({ rm: p.rm, name: p.name, insurance: p.insurance }); }} style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "none", background: "none", cursor: "pointer", fontSize: 11.5, fontWeight: 700, color: "#0f172a", display: "flex", alignItems: "center", gap: 6 }}>
                                 🩺 Mulai Encounter
                               </button>
                               <button onClick={() => { setActiveMenuRm(null); onMakeAppointment?.({ rm: p.rm, name: p.name, phone: p.phone }); }} style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "none", background: "none", cursor: "pointer", fontSize: 11.5, fontWeight: 700, color: "#0f172a", display: "flex", alignItems: "center", gap: 6 }}>
@@ -631,7 +647,7 @@ export default function PatientsView({ onMakeAppointment, onStartEncounter }: Pa
               </div>
 
               <button 
-                onClick={() => onStartEncounter?.({ rm: selectedPatient.rm, name: selectedPatient.name })}
+                onClick={() => onStartEncounter?.({ rm: selectedPatient.rm, name: selectedPatient.name, insurance: selectedPatient.insurance })}
                 style={{ width: "100%", marginTop: 8, padding: "11px 0", borderRadius: 12, border: "1px solid #bbf7d0", background: "#f0fdf4", color: "#166534", fontSize: 12.5, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                 Lihat Riwayat Medis Pasien →
               </button>

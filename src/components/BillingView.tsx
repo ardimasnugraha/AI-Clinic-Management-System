@@ -40,9 +40,47 @@ export default function BillingView() {
 
   useEffect(() => {
     try {
+      const cachedPatientsStr = localStorage.getItem("clinic_patients_v1");
+      const cachedPatients: any[] = cachedPatientsStr ? JSON.parse(cachedPatientsStr) : [];
+
       const cached = localStorage.getItem("clinic_billing_v1");
       if (cached) {
-        setInvoices(JSON.parse(cached));
+        let loadedInvoices: Invoice[] = JSON.parse(cached);
+        let hasChanges = false;
+
+        loadedInvoices = loadedInvoices.map(inv => {
+          const matchingPatient = cachedPatients.find(p => p.rm === inv.patientRm || p.name.toLowerCase() === inv.patientName.toLowerCase());
+          if (matchingPatient && matchingPatient.insurance) {
+            const patientIns = matchingPatient.insurance;
+            const insLower = patientIns.toLowerCase();
+            const isIns = insLower.includes("bpjs") || insLower.includes("inhealth") || insLower.includes("prudential") || (insLower.length > 0 && !insLower.includes("umum") && !insLower.includes("bayar sendiri") && !insLower.includes("pribadi"));
+
+            if (isIns) {
+              const cleanedItems = inv.items.filter(item => !item.name.toLowerCase().includes("konsultasi"));
+              const newTotal = cleanedItems.reduce((acc, item) => acc + item.amount, 0);
+
+              if (inv.insurance !== patientIns || inv.items.length !== cleanedItems.length || inv.total !== newTotal) {
+                hasChanges = true;
+                return {
+                  ...inv,
+                  insurance: patientIns,
+                  items: cleanedItems,
+                  subtotal: newTotal,
+                  total: newTotal
+                };
+              }
+            } else if (!inv.insurance) {
+              hasChanges = true;
+              return { ...inv, insurance: patientIns };
+            }
+          }
+          return inv;
+        });
+
+        setInvoices(loadedInvoices);
+        if (hasChanges) {
+          localStorage.setItem("clinic_billing_v1", JSON.stringify(loadedInvoices));
+        }
       } else {
         setInvoices([]);
       }

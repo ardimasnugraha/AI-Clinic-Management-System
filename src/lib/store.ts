@@ -50,6 +50,7 @@ export interface QueueItem {
   patientId?: string;
   name: string;
   phone?: string;
+  insurance?: string;
   poli: string;
   doctorName?: string;
   status: "menunggu" | "dipanggil" | "selesai" | "dibatalkan";
@@ -207,7 +208,7 @@ export const addLabOrderFromEncounter = (labData: { patientRm: string; patientNa
 };
 
 // Helper: Directly Add Queue Ticket from Patient View
-export const addQueueTicketDirect = (patient: { rm: string; name: string; phone?: string }, poli: string) => {
+export const addQueueTicketDirect = (patient: { rm: string; name: string; phone?: string; insurance?: string }, poli: string) => {
   if (typeof window === "undefined") return null;
   try {
     const cachedQueue = localStorage.getItem("clinic_queue_v1");
@@ -226,6 +227,7 @@ export const addQueueTicketDirect = (patient: { rm: string; name: string; phone?
       patientId: patient.rm,
       name: patient.name,
       phone: patient.phone || "",
+      insurance: patient.insurance || "Umum / Bayar Sendiri",
       poli,
       status: "menunggu",
       wait: "5-10 menit",

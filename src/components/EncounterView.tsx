@@ -61,6 +61,16 @@ const fetchPatientInfo = async (rm: string) => {
     const { data, error } = await supabase.from("patients").select("*").eq("medical_record_number", rm).single();
     if (!error && data) return data;
   } catch (e) {}
+
+  try {
+    const cachedLocal = localStorage.getItem("clinic_patients_v1");
+    if (cachedLocal) {
+      const localList = JSON.parse(cachedLocal);
+      const found = localList.find((p: any) => p.rm === rm || p.name.toLowerCase() === rm.toLowerCase());
+      if (found) return found;
+    }
+  } catch (e) {}
+
   return null;
 };
 
@@ -100,12 +110,13 @@ const fetchPatientInfo = async (rm: string) => {
     const docs = getStoredDoctors();
     setDoctorsList(docs);
 
-    // Load registered patients list from Supabase
+    // Load registered patients list from Supabase & LocalStorage
     async function loadPatients() {
+      let mapped: any[] = [];
       try {
         const { data, error } = await supabase.from("patients").select("*").order("created_at", { ascending: false });
         if (!error && data) {
-          const mapped = data.map((p: any) => ({
+          mapped = data.map((p: any) => ({
             rm: p.medical_record_number,
             name: p.full_name,
             phone: p.phone || "-",
@@ -117,43 +128,81 @@ const fetchPatientInfo = async (rm: string) => {
             conditions: [],
             insurance: p.insurance || "Umum / Bayar Sendiri"
           }));
-          setRegisteredPatientsList(mapped);
         }
       } catch (e) {}
+
+      try {
+        const cachedLocal = localStorage.getItem("clinic_patients_v1");
+        if (cachedLocal) {
+          const localPatients = JSON.parse(cachedLocal);
+          localPatients.forEach((lp: any) => {
+            if (!mapped.some(p => p.rm === lp.rm || p.name.toLowerCase() === lp.name.toLowerCase())) {
+              mapped.push({
+                rm: lp.rm,
+                name: lp.name,
+                phone: lp.phone || "-",
+                gender: lp.gender || "Laki-laki",
+                age: lp.age || 35,
+                poli: "Poli Umum",
+                doctorName: "dr. Maya Lestari",
+                allergies: lp.allergies || [],
+                conditions: lp.conditions || [],
+                insurance: lp.insurance || "Umum / Bayar Sendiri"
+              });
+            } else {
+              const existing = mapped.find(p => p.rm === lp.rm || p.name.toLowerCase() === lp.name.toLowerCase());
+              if (existing && lp.insurance) {
+                existing.insurance = lp.insurance;
+              }
+            }
+          });
+        }
+      } catch (e) {}
+
+      setRegisteredPatientsList(mapped);
     }
     loadPatients();
 
+    const cachedQueue = localStorage.getItem("clinic_queue_v1");
+    if (cachedQueue) {
+      const queueList = JSON.parse(cachedQueue);
+      const activeList = queueList.filter((q: any) => q.status === "dipanggil" || q.status === "menunggu");
+      setWaitingQueueList(activeList);
 
-
-      const cachedQueue = localStorage.getItem("clinic_queue_v1");
-      if (cachedQueue) {
-        const queueList = JSON.parse(cachedQueue);
-        const activeList = queueList.filter((q: any) => q.status === "dipanggil" || q.status === "menunggu");
-        setWaitingQueueList(activeList);
-
-        if (!initialPatient) {
-          const currentCalled = queueList.find((q: any) => q.status === "dipanggil");
-          if (currentCalled) {
-            // Find patient details (including insurance) from registered patients list
-            const patientInfo = registeredPatientsList.find(p => p.rm === (currentCalled.patientId || "")) || {} as any;
-            setActivePatient(prev => ({
-              ...prev,
-              rm: currentCalled.patientId || "RM0001236",
-              name: currentCalled.name,
-              poli: currentCalled.poli,
-              queueNo: currentCalled.no,
-              doctor: currentCalled.doctorName || "dr. Maya Lestari",
-              insurance: patientInfo.insurance || "Umum / Bayar Sendiri"
-            }));
-          }
+      if (!initialPatient) {
+        const currentCalled = queueList.find((q: any) => q.status === "dipanggil");
+        if (currentCalled) {
+          const patientInfo = registeredPatientsList.find(p => p.rm === (currentCalled.patientId || "")) || {} as any;
+          setActivePatient(prev => ({
+            ...prev,
+            rm: currentCalled.patientId || "RM0001236",
+            name: currentCalled.name,
+            poli: currentCalled.poli,
+            queueNo: currentCalled.no,
+            doctor: currentCalled.doctorName || "dr. Maya Lestari",
+            insurance: currentCalled.insurance || patientInfo.insurance || "Umum / Bayar Sendiri"
+          }));
         }
       }
+    }
 
     if (initialPatient) {
+      // Find patient insurance from initialPatient, registered list, or localStorage
+      let targetIns = (initialPatient as any).insurance;
+      if (!targetIns) {
+        try {
+          const cachedLocal = localStorage.getItem("clinic_patients_v1");
+          const localList = cachedLocal ? JSON.parse(cachedLocal) : [];
+          const foundLocal = localList.find((p: any) => p.rm === initialPatient.rm || p.name.toLowerCase() === initialPatient.name.toLowerCase());
+          if (foundLocal?.insurance) targetIns = foundLocal.insurance;
+        } catch (e) {}
+      }
+
       setActivePatient(prev => ({
         ...prev,
         rm: initialPatient.rm,
-        name: initialPatient.name
+        name: initialPatient.name,
+        insurance: targetIns || prev.insurance || "Umum / Bayar Sendiri"
       }));
       if (onClearInitialPatient) onClearInitialPatient();
     }
@@ -162,38 +211,48 @@ const fetchPatientInfo = async (rm: string) => {
   const handleSelectPatientAny = async (rmOrName: string) => {
     if (!rmOrName) return;
     const foundQueue = waitingQueueList.find(q => (q.patientId === rmOrName || q.name === rmOrName));
-    const foundPatient = registeredPatientsList.find(p => (p.rm === rmOrName || p.name === rmOrName));
+    const foundPatient = registeredPatientsList.find(p => (p.rm === rmOrName || p.name.toLowerCase() === rmOrName.toLowerCase()));
+
+    // Check localStorage directly for exact match
+    let localIns = "";
+    try {
+      const cachedLocal = localStorage.getItem("clinic_patients_v1");
+      const localList: any[] = cachedLocal ? JSON.parse(cachedLocal) : [];
+      const foundLocal = localList.find(p => (p.rm === rmOrName || p.name.toLowerCase() === rmOrName.toLowerCase()));
+      if (foundLocal?.insurance) localIns = foundLocal.insurance;
+    } catch (e) {}
 
     if (foundQueue) {
-        // Retrieve patient info (including insurance) from Supabase if not in list
-        const patientInfo = await fetchPatientInfo(foundQueue.patientId || "");
-        setActivePatient({
-          rm: foundQueue.patientId || `RM000${Math.floor(1000 + Math.random() * 9000)}`,
-          name: foundQueue.name,
-          gender: "Laki-laki",
-          age: 35,
-          poli: foundQueue.poli,
-          queueNo: foundQueue.no,
-          doctor: foundQueue.doctorName || doctorsList[0]?.name || "dr. Maya Lestari",
-          allergies: [],
-          conditions: [],
-          insurance: patientInfo?.insurance || "Umum / Bayar Sendiri"
-        });
-        showToast(`Pasien Antrean ${foundQueue.name} (${foundQueue.no}) terpilih.`);
-      } else if (foundPatient) {
+      const patientInfo = await fetchPatientInfo(foundQueue.patientId || "");
+      const queueIns = (foundQueue as any).insurance || localIns || patientInfo?.insurance || "Umum / Bayar Sendiri";
       setActivePatient({
-        rm: foundPatient.rm,
-        name: foundPatient.name,
-        gender: foundPatient.gender || "Laki-laki",
-        age: foundPatient.age || 35,
-        poli: foundPatient.poli || "Poli Umum",
-        queueNo: "Direct",
-        doctor: foundPatient.doctorName || doctorsList[0]?.name || "dr. Maya Lestari",
-        allergies: foundPatient.allergies || [],
-        conditions: foundPatient.conditions || [],
-        insurance: foundPatient.insurance || "Umum / Bayar Sendiri"
+        rm: foundQueue.patientId || `RM000${Math.floor(1000 + Math.random() * 9000)}`,
+        name: foundQueue.name,
+        gender: patientInfo?.gender || "Laki-laki",
+        age: patientInfo?.age || 35,
+        poli: foundQueue.poli,
+        queueNo: foundQueue.no,
+        doctor: foundQueue.doctorName || doctorsList[0]?.name || "dr. Maya Lestari",
+        allergies: [],
+        conditions: [],
+        insurance: queueIns
       });
-      showToast(`Pasien Terdaftar ${foundPatient.name} (${foundPatient.rm}) terpilih.`);
+      showToast(`Pasien Antrean ${foundQueue.name} (${foundQueue.no}) terpilih.`);
+    } else if (foundPatient || localIns) {
+      const p = foundPatient || {} as any;
+      setActivePatient({
+        rm: p.rm || rmOrName,
+        name: p.name || rmOrName,
+        gender: p.gender || "Laki-laki",
+        age: p.age || 35,
+        poli: p.poli || "Poli Umum",
+        queueNo: "Direct",
+        doctor: p.doctorName || doctorsList[0]?.name || "dr. Maya Lestari",
+        allergies: p.allergies || [],
+        conditions: p.conditions || [],
+        insurance: localIns || p.insurance || "Umum / Bayar Sendiri"
+      });
+      showToast(`Pasien Terdaftar ${p.name || rmOrName} terpilih.`);
     }
   };
 

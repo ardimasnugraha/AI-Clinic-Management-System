@@ -5,7 +5,7 @@ import {
   Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight, Search, 
   Filter, Clock, User, CheckCircle2, AlertCircle, Phone, 
   Stethoscope, Building2, FileText, ArrowRight, RefreshCw, Sparkles,
-  Check, X, Activity, UserCheck
+  Check, X, Activity, UserCheck, HeartPulse
 } from "lucide-react";
 import { supabase, isConfigured } from "@/lib/supabase/client";
 import { addQueueTicketDirect } from "@/lib/store";
@@ -30,6 +30,29 @@ export interface AppointmentItem {
   dayIndex?: number; // 0: Sen, 1: Sel, etc.
 }
 
+// Doctor Specialty & Poli Auto Mapping Dictionary
+const DOCTOR_MAP: Record<string, { poli: string; keywords: string[] }> = {
+  "dr. Maya Lestari": { poli: "Poli Umum", keywords: ["demam", "flu", "pusing", "batuk", "umum"] },
+  "drg. Sari Dewi": { poli: "Poli Gigi", keywords: ["gigi", "gusi", "behel", "tambal"] },
+  "dr. Ahmad Rizki": { poli: "Poli Jantung", keywords: ["jantung", "dada", "hipertensi", "sesak"] },
+  "dr. Laila Rahmawati": { poli: "Poli Kulit", keywords: ["kulit", "gatal", "jerawat", "ruam", "alergi kulit"] },
+  "dr. Rudi Setiawan": { poli: "Poli Anak", keywords: ["anak", "bayi", "imunisasi", "demam anak"] },
+  "dr. Hendra Kusuma": { poli: "Poli Mata", keywords: ["mata", "katarak", "minus", "penglihatan"] },
+  "dr. Bagus W.": { poli: "Poli Penyakit Dalam", keywords: ["lambung", "maag", "diabetes", "penyakit dalam"] },
+  "dr. Dimas A.": { poli: "Poli Gigi", keywords: ["gigi", "gusi"] },
+  "dr. Ratna Sari": { poli: "Poli Anak", keywords: ["anak"] }
+};
+
+const POLI_DEFAULT_DOCTOR: Record<string, string> = {
+  "Poli Umum": "dr. Maya Lestari",
+  "Poli Gigi": "drg. Sari Dewi",
+  "Poli Jantung": "dr. Ahmad Rizki",
+  "Poli Kulit": "dr. Laila Rahmawati",
+  "Poli Anak": "dr. Rudi Setiawan",
+  "Poli Mata": "dr. Hendra Kusuma",
+  "Poli Penyakit Dalam": "dr. Bagus W."
+};
+
 const DEFAULT_APPOINTMENTS: AppointmentItem[] = [
   { id: "APT-001", patientName: "Andi Pratama", phone: "0812-3456-7890", doctorName: "dr. Maya Lestari", poli: "Poli Umum", date: "2025-05-19", time: "08:00", type: "Konsultasi", status: "Selesai", dayIndex: 0 },
   { id: "APT-002", patientName: "Siti Nurhaliza", phone: "0813-8765-4321", doctorName: "dr. Dimas A.", poli: "Poli Gigi", date: "2025-05-19", time: "10:00", type: "Kontrol", status: "Berjalan", dayIndex: 0 },
@@ -38,24 +61,24 @@ const DEFAULT_APPOINTMENTS: AppointmentItem[] = [
   
   { id: "APT-005", patientName: "Rudi Hermawan", phone: "0814-5566-7788", doctorName: "dr. Dimas A.", poli: "Poli Gigi", date: "2025-05-20", time: "09:00", type: "Konsultasi", status: "Selesai", dayIndex: 1 },
   { id: "APT-006", patientName: "Lina Marlina", phone: "0815-1122-3344", doctorName: "dr. Maya Lestari", poli: "Poli Umum", date: "2025-05-20", time: "11:30", type: "Kontrol", status: "Berjalan", dayIndex: 1 },
-  { id: "APT-007", patientName: "Agus Setiawan", phone: "0816-3344-5566", doctorName: "dr. Dimas A.", poli: "Poli Gigi", date: "2025-05-20", time: "14:30", type: "Konsultasi", status: "Menunggu", dayIndex: 1 },
+  { id: "APT-007", patientName: "Agus Setiawan", phone: "0816-3344-5566", doctorName: "dr. Ahmad Rizki", poli: "Poli Jantung", date: "2025-05-20", time: "14:30", type: "Konsultasi", status: "Menunggu", dayIndex: 1 },
   
   { id: "APT-008", patientName: "Tono Wijaya", phone: "0817-4455-6677", doctorName: "dr. Ratna Sari", poli: "Poli Anak", date: "2025-05-21", time: "08:30", type: "Konsultasi", status: "Selesai", dayIndex: 2 },
   { id: "APT-009", patientName: "Nia Kurniawati", phone: "0818-5566-7788", doctorName: "dr. Maya Lestari", poli: "Poli Umum", date: "2025-05-21", time: "10:30", type: "Kontrol", status: "Berjalan", dayIndex: 2 },
-  { id: "APT-010", patientName: "Dian Puspita", phone: "0819-6677-8899", doctorName: "dr. Dimas A.", poli: "Poli Gigi", date: "2025-05-21", time: "13:30", type: "Tindakan", status: "Menunggu", dayIndex: 2 },
+  { id: "APT-010", patientName: "Dian Puspita", phone: "0819-6677-8899", doctorName: "dr. Laila Rahmawati", poli: "Poli Kulit", date: "2025-05-21", time: "13:30", type: "Tindakan", status: "Menunggu", dayIndex: 2 },
   { id: "APT-011", patientName: "Slamet Riyadi", phone: "0820-7788-9900", doctorName: "dr. Bagus W.", poli: "Poli Penyakit Dalam", date: "2025-05-21", time: "16:00", type: "Konsultasi", status: "Baru", dayIndex: 2 },
   
-  { id: "APT-012", patientName: "Fajar Nugroho", phone: "0821-1122-3344", doctorName: "dr. Dimas A.", poli: "Poli Gigi", date: "2025-05-22", time: "09:00", type: "Konsultasi", status: "Baru", dayIndex: 3 },
+  { id: "APT-012", patientName: "Fajar Nugroho", phone: "0821-1122-3344", doctorName: "drg. Sari Dewi", poli: "Poli Gigi", date: "2025-05-22", time: "09:00", type: "Konsultasi", status: "Baru", dayIndex: 3 },
   { id: "APT-013", patientName: "Yulia Safitri", phone: "0822-2233-4455", doctorName: "dr. Maya Lestari", poli: "Poli Umum", date: "2025-05-22", time: "11:00", type: "Kontrol", status: "Baru", dayIndex: 3 },
-  { id: "APT-014", patientName: "Heri Susanto", phone: "0823-3344-5566", doctorName: "dr. Dimas A.", poli: "Poli Gigi", date: "2025-05-22", time: "14:00", type: "Konsultasi", status: "Menunggu", dayIndex: 3 },
+  { id: "APT-014", patientName: "Heri Susanto", phone: "0823-3344-5566", doctorName: "dr. Hendra Kusuma", poli: "Poli Mata", date: "2025-05-22", time: "14:00", type: "Konsultasi", status: "Menunggu", dayIndex: 3 },
   
-  { id: "APT-015", patientName: "Putri Anjani", phone: "0824-4455-6677", doctorName: "dr. Ratna Sari", poli: "Poli Anak", date: "2025-05-23", time: "08:00", type: "Telekonsultasi", status: "Baru", dayIndex: 4 },
-  { id: "APT-016", patientName: "Ahmad Fauzi", phone: "0825-5566-7788", doctorName: "dr. Dimas A.", poli: "Poli Gigi", date: "2025-05-23", time: "10:00", type: "Konsultasi", status: "Menunggu", dayIndex: 4 },
-  { id: "APT-017", patientName: "Maya Sari", phone: "0826-6677-8899", doctorName: "dr. Ratna Sari", poli: "Poli Anak", date: "2025-05-23", time: "13:00", type: "Kontrol", status: "Menunggu", dayIndex: 4 },
+  { id: "APT-015", patientName: "Putri Anjani", phone: "0824-4455-6677", doctorName: "dr. Rudi Setiawan", poli: "Poli Anak", date: "2025-05-23", time: "08:00", type: "Telekonsultasi", status: "Baru", dayIndex: 4 },
+  { id: "APT-016", patientName: "Ahmad Fauzi", phone: "0825-5566-7788", doctorName: "dr. Ahmad Rizki", poli: "Poli Jantung", date: "2025-05-23", time: "10:00", type: "Konsultasi", status: "Menunggu", dayIndex: 4 },
+  { id: "APT-017", patientName: "Maya Sari", phone: "0826-6677-8899", doctorName: "dr. Rudi Setiawan", poli: "Poli Anak", date: "2025-05-23", time: "13:00", type: "Kontrol", status: "Menunggu", dayIndex: 4 },
   
   { id: "APT-018", patientName: "Ika Lestari", phone: "0827-7788-9900", doctorName: "dr. Maya Lestari", poli: "Poli Umum", date: "2025-05-24", time: "09:30", type: "Konsultasi", status: "Baru", dayIndex: 5 },
   { id: "APT-019", patientName: "Dedi Kurnia", phone: "0828-8899-0011", doctorName: "dr. Bagus W.", poli: "Poli Penyakit Dalam", date: "2025-05-24", time: "12:00", type: "Tindakan", status: "Baru", dayIndex: 5 },
-  { id: "APT-020", patientName: "Rahmawati", phone: "0829-9900-1122", doctorName: "dr. Dimas A.", poli: "Poli Gigi", date: "2025-05-24", time: "15:00", type: "Konsultasi", status: "Menunggu", dayIndex: 5 },
+  { id: "APT-020", patientName: "Rahmawati", phone: "0829-9900-1122", doctorName: "drg. Sari Dewi", poli: "Poli Gigi", date: "2025-05-24", time: "15:00", type: "Konsultasi", status: "Menunggu", dayIndex: 5 },
   
   { id: "APT-021", patientName: "Bambang H.", phone: "0830-0011-2233", doctorName: "dr. Bagus W.", poli: "Poli Penyakit Dalam", date: "2025-05-25", time: "10:00", type: "Konsultasi", status: "Baru", dayIndex: 6 }
 ];
@@ -72,6 +95,9 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
+  const [complaintInput, setComplaintInput] = useState("");
+  const [aiSuggestedInfo, setAiSuggestedInfo] = useState<string | null>(null);
+
   const [newAppt, setNewAppt] = useState({
     patientName: "",
     phone: "",
@@ -88,6 +114,47 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3000);
+  };
+
+  // Auto-sync Poli when Doctor Changes
+  const handleDoctorChange = (docName: string) => {
+    const matchedPoli = DOCTOR_MAP[docName]?.poli || "Poli Umum";
+    setNewAppt(prev => ({
+      ...prev,
+      doctorName: docName,
+      poli: matchedPoli
+    }));
+    showToast(`🤖 AI: Dokter ${docName} dipilih → Poli otomatis diset ke ${matchedPoli}`);
+  };
+
+  // Auto-sync Doctor when Poli Changes
+  const handlePoliChange = (poliName: string) => {
+    const defaultDoc = POLI_DEFAULT_DOCTOR[poliName] || "dr. Maya Lestari";
+    setNewAppt(prev => ({
+      ...prev,
+      poli: poliName,
+      doctorName: defaultDoc
+    }));
+    showToast(`🤖 AI: ${poliName} dipilih → Dokter otomatis diset ke ${defaultDoc}`);
+  };
+
+  // Auto-detect Complaint / Keluhan to match Doctor & Poli
+  const handleComplaintChange = (text: string) => {
+    setComplaintInput(text);
+    const lower = text.toLowerCase();
+
+    for (const [docName, info] of Object.entries(DOCTOR_MAP)) {
+      if (info.keywords.some(kw => lower.includes(kw))) {
+        setNewAppt(prev => ({
+          ...prev,
+          doctorName: docName,
+          poli: info.poli
+        }));
+        setAiSuggestedInfo(`✨ AI merekomendasikan ${docName} (${info.poli}) sesuai keluhan "${text}"`);
+        return;
+      }
+    }
+    setAiSuggestedInfo(null);
   };
 
   // Prefill if initialPatient passed
@@ -175,15 +242,15 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
 
     setShowModal(false);
     if (onClearInitialPatient) onClearInitialPatient();
-    showToast(`✅ Berhasil membuat appointment untuk ${created.patientName} (${created.time})`);
+    showToast(`✅ Berhasil membuat appointment untuk ${created.patientName} (${created.doctorName} - ${created.poli})`);
   };
 
   // Perform Check-in
   const handlePerformCheckIn = (apt: AppointmentItem) => {
-    addQueueTicketDirect({ rm: "RM000123", name: apt.patientName, phone: apt.phone }, apt.poli.replace("Poli ", ""));
+    addQueueTicketDirect({ rm: "RM000123", name: apt.patientName, phone: apt.phone }, (apt.poli || "Umum").replace("Poli ", ""));
     const updated = appointments.map(a => a.id === apt.id ? { ...a, status: "Berjalan" as const } : a);
     setAppointments(updated);
-    showToast(`✅ ${apt.patientName} berhasil Check-in & masuk ke antrean Poli!`);
+    showToast(`✅ ${apt.patientName} berhasil Check-in ke ${apt.poli}!`);
   };
 
   // Type Color Badges Helper
@@ -220,7 +287,7 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
       {/* ================= MODAL BUAT APPOINTMENT ================= */}
       {showModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-          <div style={{ background: "#fff", borderRadius: 24, width: "100%", maxWidth: 460, padding: 24, boxShadow: "0 25px 50px rgba(0,0,0,0.25)" }}>
+          <div style={{ background: "#fff", borderRadius: 24, width: "100%", maxWidth: 480, padding: 24, boxShadow: "0 25px 50px rgba(0,0,0,0.25)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ width: 34, height: 34, borderRadius: 10, background: "#e0f2fe", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -237,31 +304,64 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
                 <input type="text" required placeholder="Masukkan nama pasien" value={newAppt.patientName} onChange={e => setNewAppt({ ...newAppt, patientName: e.target.value })} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 12.5, outline: "none" }} />
               </div>
 
+              {/* AI Auto Suggestion Keluhan / Penyakit Pasien */}
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                  <span>Keluhan / Penyakit Pasien</span>
+                  <span style={{ fontSize: 10, background: "#f3e8ff", color: "#6b21a8", padding: "1px 6px", borderRadius: 6, fontWeight: 800 }}>AI Auto-Match</span>
+                </label>
+                <input 
+                  type="text" 
+                  placeholder="Ketik keluhan (cth: Nyeri Dada/Jantung, Sakit Gigi, Gatal Kulit, Mata)..." 
+                  value={complaintInput} 
+                  onChange={e => handleComplaintChange(e.target.value)} 
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 12, outline: "none", background: "#fafafa" }} 
+                />
+                {aiSuggestedInfo && (
+                  <div style={{ fontSize: 11, color: "#6b21a8", fontWeight: 700, marginTop: 4, background: "#faf5ff", padding: "4px 8px", borderRadius: 6 }}>
+                    {aiSuggestedInfo}
+                  </div>
+                )}
+              </div>
+
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>No. HP Pasien</label>
-                  <input type="tel" placeholder="08xxxxxxxxxx" value={newAppt.phone} onChange={e => setNewAppt({ ...newAppt, phone: e.target.value })} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 12.5, outline: "none" }} />
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Dokter Pemeriksa *</label>
+                  <select 
+                    value={newAppt.doctorName} 
+                    onChange={e => handleDoctorChange(e.target.value)} 
+                    style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #0d9488", fontSize: 12.5, outline: "none", cursor: "pointer", fontWeight: 800, color: "#0d9488" }}>
+                    <option value="dr. Maya Lestari">dr. Maya Lestari (Umum)</option>
+                    <option value="drg. Sari Dewi">drg. Sari Dewi (Gigi)</option>
+                    <option value="dr. Ahmad Rizki">dr. Ahmad Rizki (Jantung)</option>
+                    <option value="dr. Laila Rahmawati">dr. Laila (Kulit)</option>
+                    <option value="dr. Rudi Setiawan">dr. Rudi Setiawan (Anak)</option>
+                    <option value="dr. Hendra Kusuma">dr. Hendra Kusuma (Mata)</option>
+                    <option value="dr. Bagus W.">dr. Bagus W. (Penyakit Dalam)</option>
+                  </select>
                 </div>
+
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Poli Klinik</label>
-                  <select value={newAppt.poli} onChange={e => setNewAppt({ ...newAppt, poli: e.target.value })} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 12.5, outline: "none", cursor: "pointer" }}>
-                    <option>Poli Umum</option>
-                    <option>Poli Gigi</option>
-                    <option>Poli Anak</option>
-                    <option>Poli Penyakit Dalam</option>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Poli Klinik (Otomatis)</label>
+                  <select 
+                    value={newAppt.poli} 
+                    onChange={e => handlePoliChange(e.target.value)} 
+                    style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #0d9488", fontSize: 12.5, outline: "none", cursor: "pointer", fontWeight: 800, color: "#0d9488" }}>
+                    <option value="Poli Umum">Poli Umum</option>
+                    <option value="Poli Gigi">Poli Gigi</option>
+                    <option value="Poli Jantung">Poli Jantung</option>
+                    <option value="Poli Kulit">Poli Kulit</option>
+                    <option value="Poli Anak">Poli Anak</option>
+                    <option value="Poli Mata">Poli Mata</option>
+                    <option value="Poli Penyakit Dalam">Poli Penyakit Dalam</option>
                   </select>
                 </div>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Dokter Pemeriksa</label>
-                  <select value={newAppt.doctorName} onChange={e => setNewAppt({ ...newAppt, doctorName: e.target.value })} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 12.5, outline: "none", cursor: "pointer" }}>
-                    <option>dr. Maya Lestari</option>
-                    <option>dr. Dimas A.</option>
-                    <option>dr. Ratna Sari</option>
-                    <option>dr. Bagus W.</option>
-                  </select>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>No. HP Pasien</label>
+                  <input type="tel" placeholder="08xxxxxxxxxx" value={newAppt.phone} onChange={e => setNewAppt({ ...newAppt, phone: e.target.value })} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 12.5, outline: "none" }} />
                 </div>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Jenis Layanan</label>
@@ -283,8 +383,11 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
                   <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Jam Slot</label>
                   <select value={newAppt.time} onChange={e => setNewAppt({ ...newAppt, time: e.target.value })} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 12.5, outline: "none", cursor: "pointer" }}>
                     <option>08:00</option>
+                    <option>08:30</option>
                     <option>09:00</option>
+                    <option>09:30</option>
                     <option>10:00</option>
+                    <option>10:30</option>
                     <option>11:00</option>
                     <option>13:00</option>
                     <option>14:00</option>
@@ -323,10 +426,13 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
           <span style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", marginBottom: 2 }}>Dokter</span>
           <select value={filterDoctor} onChange={e => setFilterDoctor(e.target.value)} style={{ padding: "8px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 12, fontWeight: 700, color: "#334155", background: "#fff", cursor: "pointer", outline: "none" }}>
             <option>Semua Dokter</option>
-            <option>dr. Maya Lestari</option>
-            <option>dr. Dimas A.</option>
-            <option>dr. Ratna Sari</option>
-            <option>dr. Bagus W.</option>
+            <option>dr. Maya Lestari (Umum)</option>
+            <option>drg. Sari Dewi (Gigi)</option>
+            <option>dr. Ahmad Rizki (Jantung)</option>
+            <option>dr. Laila Rahmawati (Kulit)</option>
+            <option>dr. Rudi Setiawan (Anak)</option>
+            <option>dr. Hendra Kusuma (Mata)</option>
+            <option>dr. Bagus W. (Penyakit Dalam)</option>
           </select>
         </div>
 
@@ -337,7 +443,10 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
             <option>Semua Poli</option>
             <option>Poli Umum</option>
             <option>Poli Gigi</option>
+            <option>Poli Jantung</option>
+            <option>Poli Kulit</option>
             <option>Poli Anak</option>
+            <option>Poli Mata</option>
             <option>Poli Penyakit Dalam</option>
           </select>
         </div>
@@ -431,7 +540,7 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
                         <td key={dh.day} style={{ borderLeft: "1px solid #f8fafc", padding: 2, verticalAlign: "top" }}>
                           {matchedApt && (
                             <div 
-                              onClick={() => showToast(`📅 ${matchedApt.patientName} (${matchedApt.time}) - ${matchedApt.doctorName}`)}
+                              onClick={() => showToast(`📅 ${matchedApt.patientName} (${matchedApt.time}) - ${matchedApt.doctorName} (${matchedApt.poli})`)}
                               style={{ 
                                 background: col?.bg, border: `1px solid ${col?.border}`, color: col?.text,
                                 borderRadius: 8, padding: "4px 6px", textAlign: "left", cursor: "pointer",
@@ -444,7 +553,7 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
                                 {matchedApt.patientName}
                               </div>
                               <div style={{ fontSize: 8.5, color: "#64748b", marginTop: 1 }}>{matchedApt.doctorName}</div>
-                              <div style={{ fontSize: 8, fontWeight: 700, color: col?.text }}>{matchedApt.type}</div>
+                              <div style={{ fontSize: 8, fontWeight: 700, color: col?.text }}>{matchedApt.poli}</div>
                             </div>
                           )}
                         </td>
@@ -479,7 +588,7 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
                       <div style={{ fontSize: 11.5, fontWeight: 800, color: "#0f172a" }}>
                         <span style={{ color: "#0d9488", marginRight: 6 }}>{apt.time}</span>{apt.patientName || "Pasien"}
                       </div>
-                      <div style={{ fontSize: 10, color: "#64748b" }}>{apt.doctorName} - {apt.type}</div>
+                      <div style={{ fontSize: 10, color: "#64748b" }}>{apt.doctorName} • {apt.poli}</div>
                     </div>
                   </div>
 
@@ -500,7 +609,7 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
               {/* Doctor 1 */}
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 800, color: "#0f172a", marginBottom: 4 }}>
-                  <span>dr. Maya Lestari <span style={{ fontWeight: 500, color: "#64748b" }}>(Dokter Umum)</span></span>
+                  <span>dr. Maya Lestari <span style={{ fontWeight: 500, color: "#64748b" }}>(Poli Umum)</span></span>
                   <span style={{ color: "#0d9488" }}>13 / 20 slot</span>
                 </div>
                 <div style={{ width: "100%", height: 6, borderRadius: 10, background: "#f1f5f9", overflow: "hidden" }}>
@@ -511,7 +620,7 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
               {/* Doctor 2 */}
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 800, color: "#0f172a", marginBottom: 4 }}>
-                  <span>dr. Dimas A. <span style={{ fontWeight: 500, color: "#64748b" }}>(Dokter Gigi)</span></span>
+                  <span>drg. Sari Dewi <span style={{ fontWeight: 500, color: "#64748b" }}>(Poli Gigi)</span></span>
                   <span style={{ color: "#0284c7" }}>8 / 20 slot</span>
                 </div>
                 <div style={{ width: "100%", height: 6, borderRadius: 10, background: "#f1f5f9", overflow: "hidden" }}>
@@ -522,22 +631,22 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
               {/* Doctor 3 */}
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 800, color: "#0f172a", marginBottom: 4 }}>
-                  <span>dr. Ratna Sari <span style={{ fontWeight: 500, color: "#64748b" }}>(Dokter Anak)</span></span>
-                  <span style={{ color: "#f59e0b" }}>15 / 20 slot</span>
+                  <span>dr. Ahmad Rizki <span style={{ fontWeight: 500, color: "#64748b" }}>(Poli Jantung)</span></span>
+                  <span style={{ color: "#ef4444" }}>16 / 20 slot</span>
                 </div>
                 <div style={{ width: "100%", height: 6, borderRadius: 10, background: "#f1f5f9", overflow: "hidden" }}>
-                  <div style={{ width: "75%", height: "100%", background: "#f59e0b", borderRadius: 10 }} />
+                  <div style={{ width: "80%", height: "100%", background: "#ef4444", borderRadius: 10 }} />
                 </div>
               </div>
 
               {/* Doctor 4 */}
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 800, color: "#0f172a", marginBottom: 4 }}>
-                  <span>dr. Bagus W. <span style={{ fontWeight: 500, color: "#64748b" }}>(Penyakit Dalam)</span></span>
-                  <span style={{ color: "#3b82f6" }}>11 / 20 slot</span>
+                  <span>dr. Laila Rahmawati <span style={{ fontWeight: 500, color: "#64748b" }}>(Poli Kulit)</span></span>
+                  <span style={{ color: "#ec4899" }}>11 / 20 slot</span>
                 </div>
                 <div style={{ width: "100%", height: 6, borderRadius: 10, background: "#f1f5f9", overflow: "hidden" }}>
-                  <div style={{ width: "55%", height: "100%", background: "#3b82f6", borderRadius: 10 }} />
+                  <div style={{ width: "55%", height: "100%", background: "#ec4899", borderRadius: 10 }} />
                 </div>
               </div>
             </div>

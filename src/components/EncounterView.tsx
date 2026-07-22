@@ -376,7 +376,7 @@ const fetchPatientInfo = async (rm: string) => {
         doctorName: activePatient.doctor,
         date: new Date().toISOString().split("T")[0],
         items: [
-          { name: `Jasa Konsultasi Dokter (${activePatient.doctor})${isBPJS ? " - BPJS" : ""}`, category: "Konsultasi", amount: consultationFee },
+          ...(consultationFee > 0 ? [{ name: `Jasa Konsultasi Dokter (${activePatient.doctor})`, category: "Konsultasi", amount: consultationFee }] : []),
           ...prescriptions.map(p => ({ name: `${p.nama} (${p.jumlah} pcs)`, category: "Farmasi", amount: p.harga || 12000 }))
         ],
         subtotal: totalAmount,

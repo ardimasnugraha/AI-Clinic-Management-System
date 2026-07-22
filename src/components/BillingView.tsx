@@ -298,7 +298,7 @@ export default function BillingView() {
             {/* Rincian Items */}
             <div style={{ borderTop: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0", padding: "10px 0", marginBottom: 16 }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: "#64748b", marginBottom: 6 }}>RINCIAN ITEM TAGIHAN:</div>
-              {selectedInvoice.items.map((item, idx) => (
+              {selectedInvoice.items.filter(item => item.amount > 0).map((item, idx) => (
                 <div key={idx} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
                   <span style={{ color: "#334155" }}>{item.name}</span>
                   <span style={{ fontWeight: 700 }}>Rp {item.amount.toLocaleString("id-ID")}</span>

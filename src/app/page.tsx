@@ -396,7 +396,7 @@ export default function MainPage() {
           <div style={{ maxWidth:1500, margin:"0 auto" }}>
             {activeTab === "Dashboard"    && <DashboardView onNavigateTab={(tab) => setActiveTab(tab as any)} />}
             {activeTab === "Pasien"       && <PatientsView onMakeAppointment={handleMakeAppointmentForPatient} onStartEncounter={handleStartEncounter} />}
-            {activeTab === "Appointment"  && <AppointmentsView initialPatient={prefilledPatientForAppt} onClearInitialPatient={() => setPrefilledPatientForAppt(null)} onNavigateTab={(tab) => setActiveTab(tab as any)} />}
+            {activeTab === "Appointment"  && <AppointmentsView initialPatient={prefilledPatientForAppt} onClearInitialPatient={() => setPrefilledPatientForAppt(null)} onNavigateTab={(tab, patient) => { if (patient && tab === "Encounter") { handleStartEncounter(patient); } else { setActiveTab(tab as any); } }} />}
             {activeTab === "Antrean"      && <QueueView />}
             {activeTab === "Encounter"    && <EncounterView initialPatient={prefilledPatientForEncounter} onClearInitialPatient={() => setPrefilledPatientForEncounter(null)} />}
             {activeTab === "Laboratorium" && <LabView />}

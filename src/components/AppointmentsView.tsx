@@ -59,6 +59,8 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
   const [appointments, setAppointments] = useState<AppointmentItem[]>(DEFAULT_APPOINTMENTS);
   const [doctorsList, setDoctorsList] = useState<any[]>([]);
   const [queueList, setQueueList] = useState<any[]>([]);
+  const [registeredPatients, setRegisteredPatients] = useState<Array<{ rm: string; name: string; phone?: string }>>([]);
+  const [isManualPatientInput, setIsManualPatientInput] = useState(false);
   const [viewMode, setViewMode] = useState<"Mingguan" | "Harian">("Mingguan");
   const [checkInTab, setCheckInTab] = useState<"Check-in" | "Check-out">("Check-in");
 
@@ -149,7 +151,7 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
     }
   }, [initialPatient]);
 
-  // Fetch Appointments, Doctors, & Queues from Supabase & LocalStorage
+  // Fetch Appointments, Doctors, Queues, & Patients from Supabase & LocalStorage
   useEffect(() => {
     async function loadAllData() {
       // 1. Load Doctors
@@ -172,6 +174,36 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
       } catch (e) {
         const localQ = localStorage.getItem("clinic_queue_v1");
         if (localQ) setQueueList(JSON.parse(localQ));
+      }
+
+      // 3. Load Registered Patients
+      try {
+        const { data: pData } = await supabase.from("patients").select("*").order("full_name", { ascending: true });
+        if (pData && pData.length > 0) {
+          setRegisteredPatients(pData.map((p: any) => ({
+            rm: p.medical_record_number,
+            name: p.full_name,
+            phone: p.phone || ""
+          })));
+        } else {
+          const localP = localStorage.getItem("clinic_patients_v1");
+          if (localP) {
+            setRegisteredPatients(JSON.parse(localP).map((p: any) => ({
+              rm: p.rm,
+              name: p.name,
+              phone: p.phone || ""
+            })));
+          }
+        }
+      } catch (e) {
+        const localP = localStorage.getItem("clinic_patients_v1");
+        if (localP) {
+          setRegisteredPatients(JSON.parse(localP).map((p: any) => ({
+            rm: p.rm,
+            name: p.name,
+            phone: p.phone || ""
+          })));
+        }
       }
 
       // 3. Load Appointments
@@ -565,8 +597,47 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
 
             <form onSubmit={handleSaveAppointment} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Nama Pasien *</label>
-                <input type="text" required placeholder="Masukkan nama pasien" value={newAppt.patientName} onChange={e => setNewAppt({ ...newAppt, patientName: e.target.value })} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 12.5, outline: "none" }} />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#374151" }}>Nama Pasien *</label>
+                  <button 
+                    type="button"
+                    onClick={() => setIsManualPatientInput(!isManualPatientInput)}
+                    style={{ border: "none", background: "none", color: "#0d9488", fontSize: 11, fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}>
+                    {isManualPatientInput ? "📋 Pilih Pasien Terdaftar" : "✏️ Ketik Manual (Pasien Baru)"}
+                  </button>
+                </div>
+
+                {!isManualPatientInput && registeredPatients.length > 0 ? (
+                  <select 
+                    required
+                    value={newAppt.patientName} 
+                    onChange={e => {
+                      const selectedName = e.target.value;
+                      const found = registeredPatients.find(p => p.name === selectedName);
+                      setNewAppt(prev => ({
+                        ...prev,
+                        patientName: selectedName,
+                        phone: found?.phone || prev.phone
+                      }));
+                    }} 
+                    style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #0d9488", fontSize: 12.5, outline: "none", background: "#fff", cursor: "pointer", fontWeight: 700, color: "#0f172a" }}>
+                    <option value="">-- Pilih Pasien Terdaftar --</option>
+                    {registeredPatients.map((p, idx) => (
+                      <option key={idx} value={p.name}>
+                        {p.name} ({p.rm}){p.phone ? ` - ${p.phone}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input 
+                    type="text" 
+                    required 
+                    placeholder="Masukkan nama pasien..." 
+                    value={newAppt.patientName} 
+                    onChange={e => setNewAppt({ ...newAppt, patientName: e.target.value })} 
+                    style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 12.5, outline: "none" }} 
+                  />
+                )}
               </div>
 
               {/* AI Auto Suggestion Keluhan / Penyakit Pasien */}

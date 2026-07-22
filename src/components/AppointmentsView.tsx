@@ -53,35 +53,7 @@ const POLI_DEFAULT_DOCTOR: Record<string, string> = {
   "Poli Penyakit Dalam": "dr. Bagus W."
 };
 
-const DEFAULT_APPOINTMENTS: AppointmentItem[] = [
-  { id: "APT-001", patientName: "Andi Pratama", phone: "0812-3456-7890", doctorName: "dr. Maya Lestari", poli: "Poli Umum", date: "2025-05-19", time: "08:00", type: "Konsultasi", status: "Selesai", dayIndex: 0 },
-  { id: "APT-002", patientName: "Siti Nurhaliza", phone: "0813-8765-4321", doctorName: "dr. Dimas A.", poli: "Poli Gigi", date: "2025-05-19", time: "10:00", type: "Kontrol", status: "Berjalan", dayIndex: 0 },
-  { id: "APT-003", patientName: "Budi Santoso", phone: "0811-2233-4455", doctorName: "dr. Ratna Sari", poli: "Poli Anak", date: "2025-05-19", time: "13:00", type: "Konsultasi", status: "Menunggu", dayIndex: 0 },
-  { id: "APT-004", patientName: "Dewi Anggraini", phone: "0821-9988-7766", doctorName: "dr. Bagus W.", poli: "Poli Penyakit Dalam", date: "2025-05-19", time: "15:00", type: "Tindakan", status: "Baru", dayIndex: 0 },
-  
-  { id: "APT-005", patientName: "Rudi Hermawan", phone: "0814-5566-7788", doctorName: "dr. Dimas A.", poli: "Poli Gigi", date: "2025-05-20", time: "09:00", type: "Konsultasi", status: "Selesai", dayIndex: 1 },
-  { id: "APT-006", patientName: "Lina Marlina", phone: "0815-1122-3344", doctorName: "dr. Maya Lestari", poli: "Poli Umum", date: "2025-05-20", time: "11:30", type: "Kontrol", status: "Berjalan", dayIndex: 1 },
-  { id: "APT-007", patientName: "Agus Setiawan", phone: "0816-3344-5566", doctorName: "dr. Ahmad Rizki", poli: "Poli Jantung", date: "2025-05-20", time: "14:30", type: "Konsultasi", status: "Menunggu", dayIndex: 1 },
-  
-  { id: "APT-008", patientName: "Tono Wijaya", phone: "0817-4455-6677", doctorName: "dr. Ratna Sari", poli: "Poli Anak", date: "2025-05-21", time: "08:30", type: "Konsultasi", status: "Selesai", dayIndex: 2 },
-  { id: "APT-009", patientName: "Nia Kurniawati", phone: "0818-5566-7788", doctorName: "dr. Maya Lestari", poli: "Poli Umum", date: "2025-05-21", time: "10:30", type: "Kontrol", status: "Berjalan", dayIndex: 2 },
-  { id: "APT-010", patientName: "Dian Puspita", phone: "0819-6677-8899", doctorName: "dr. Laila Rahmawati", poli: "Poli Kulit", date: "2025-05-21", time: "13:30", type: "Tindakan", status: "Menunggu", dayIndex: 2 },
-  { id: "APT-011", patientName: "Slamet Riyadi", phone: "0820-7788-9900", doctorName: "dr. Bagus W.", poli: "Poli Penyakit Dalam", date: "2025-05-21", time: "16:00", type: "Konsultasi", status: "Baru", dayIndex: 2 },
-  
-  { id: "APT-012", patientName: "Fajar Nugroho", phone: "0821-1122-3344", doctorName: "drg. Sari Dewi", poli: "Poli Gigi", date: "2025-05-22", time: "09:00", type: "Konsultasi", status: "Baru", dayIndex: 3 },
-  { id: "APT-013", patientName: "Yulia Safitri", phone: "0822-2233-4455", doctorName: "dr. Maya Lestari", poli: "Poli Umum", date: "2025-05-22", time: "11:00", type: "Kontrol", status: "Baru", dayIndex: 3 },
-  { id: "APT-014", patientName: "Heri Susanto", phone: "0823-3344-5566", doctorName: "dr. Hendra Kusuma", poli: "Poli Mata", date: "2025-05-22", time: "14:00", type: "Konsultasi", status: "Menunggu", dayIndex: 3 },
-  
-  { id: "APT-015", patientName: "Putri Anjani", phone: "0824-4455-6677", doctorName: "dr. Rudi Setiawan", poli: "Poli Anak", date: "2025-05-23", time: "08:00", type: "Telekonsultasi", status: "Baru", dayIndex: 4 },
-  { id: "APT-016", patientName: "Ahmad Fauzi", phone: "0825-5566-7788", doctorName: "dr. Ahmad Rizki", poli: "Poli Jantung", date: "2025-05-23", time: "10:00", type: "Konsultasi", status: "Menunggu", dayIndex: 4 },
-  { id: "APT-017", patientName: "Maya Sari", phone: "0826-6677-8899", doctorName: "dr. Rudi Setiawan", poli: "Poli Anak", date: "2025-05-23", time: "13:00", type: "Kontrol", status: "Menunggu", dayIndex: 4 },
-  
-  { id: "APT-018", patientName: "Ika Lestari", phone: "0827-7788-9900", doctorName: "dr. Maya Lestari", poli: "Poli Umum", date: "2025-05-24", time: "09:30", type: "Konsultasi", status: "Baru", dayIndex: 5 },
-  { id: "APT-019", patientName: "Dedi Kurnia", phone: "0828-8899-0011", doctorName: "dr. Bagus W.", poli: "Poli Penyakit Dalam", date: "2025-05-24", time: "12:00", type: "Tindakan", status: "Baru", dayIndex: 5 },
-  { id: "APT-020", patientName: "Rahmawati", phone: "0829-9900-1122", doctorName: "drg. Sari Dewi", poli: "Poli Gigi", date: "2025-05-24", time: "15:00", type: "Konsultasi", status: "Menunggu", dayIndex: 5 },
-  
-  { id: "APT-021", patientName: "Bambang H.", phone: "0830-0011-2233", doctorName: "dr. Bagus W.", poli: "Poli Penyakit Dalam", date: "2025-05-25", time: "10:00", type: "Konsultasi", status: "Baru", dayIndex: 6 }
-];
+const DEFAULT_APPOINTMENTS: AppointmentItem[] = [];
 
 export default function AppointmentsView({ initialPatient, onClearInitialPatient, onNavigateTab }: AppointmentsViewProps) {
   const [appointments, setAppointments] = useState<AppointmentItem[]>(DEFAULT_APPOINTMENTS);

@@ -27,25 +27,14 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
   const [activeAiModal, setActiveAiModal] = useState<{ title: string; desc: string; detail: string } | null>(null);
 
   // Real-time Supabase & Store Data States
-  const [patientCount, setPatientCount] = useState<number>(128);
-  const [todayApptCount, setTodayApptCount] = useState<number>(24);
-  const [activeQueueCount, setActiveQueueCount] = useState<number>(12);
-  const [todayRevenue, setTodayRevenue] = useState<number>(18450000);
+  const [patientCount, setPatientCount] = useState<number>(0);
+  const [todayApptCount, setTodayApptCount] = useState<number>(0);
+  const [activeQueueCount, setActiveQueueCount] = useState<number>(0);
+  const [todayRevenue, setTodayRevenue] = useState<number>(0);
 
-  const [appointmentsList, setAppointmentsList] = useState<Array<{ time: string; name: string; type: string; status: string }>>([
-    { time: "08:30", name: "Andi Pratama", type: "Konsultasi Umum", status: "Selesai" },
-    { time: "09:30", name: "Siti Nurhaliza", type: "Kontrol Hipertensi", status: "Berjalan" },
-    { time: "10:30", name: "Budi Santoso", type: "Konsultasi & Resep", status: "Menunggu" },
-    { time: "11:30", name: "Dewi Anggraini", type: "Flu & Batuk", status: "Terjadwal" }
-  ]);
+  const [appointmentsList, setAppointmentsList] = useState<Array<{ time: string; name: string; type: string; status: string }>>([]);
 
-  const [liveQueue, setLiveQueue] = useState<Array<{ no: string; name: string; service: string; time: string; status: string }>>([
-    { no: "A001", name: "Andi Pratama", service: "Konsultasi Umum", time: "08:15", status: "Sedang Dilayani" },
-    { no: "A002", name: "Siti Nurhaliza", service: "Kontrol Hipertensi", time: "08:40", status: "Dipanggil" },
-    { no: "A003", name: "Budi Santoso", service: "Konsultasi & Resep", time: "09:05", status: "Menunggu" },
-    { no: "A004", name: "Dewi Anggraini", service: "Flu & Batuk", time: "09:30", status: "Menunggu" },
-    { no: "A005", name: "Rudi Hermawan", service: "Nyeri Punggung", time: "10:00", status: "Menunggu" }
-  ]);
+  const [liveQueue, setLiveQueue] = useState<Array<{ no: string; name: string; service: string; time: string; status: string }>>([]);
 
   const [doctorsList, setDoctorsList] = useState<Array<{ name: string; poli: string; time: string; count: number; initials: string; bg: string; color: string; sip?: string; phone?: string }>>([
     { name: "dr. Maya Lestari", poli: "Dokter Umum", time: "08:00 - 15:00", count: 8, initials: "ML", bg: "#ccfbf1", color: "#0d9488", sip: "SIP-2024-001", phone: "0812-1111-2222" },
@@ -54,7 +43,7 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
     { name: "dr. Bagus W.", poli: "Spesialis Penyakit Dalam", time: "13:00 - 20:00", count: 7, initials: "BW", bg: "#fef3c7", color: "#d97706", sip: "SIP-2024-004", phone: "0812-7777-8888" }
   ]);
 
-  const [encounterStats, setEncounterStats] = useState({ total: 118, selesai: 86, dirujuk: 8, followUp: 24 });
+  const [encounterStats, setEncounterStats] = useState({ total: 0, selesai: 0, dirujuk: 0, followUp: 0 });
   const [auditTime, setAuditTime] = useState("10:24");
 
   // Fetch Supabase Data dynamically

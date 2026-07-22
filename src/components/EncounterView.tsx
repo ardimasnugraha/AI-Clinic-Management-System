@@ -6,6 +6,7 @@ import {
   FileText, FlaskConical, CheckCircle2, AlertTriangle, Sparkles, Clock, User, Save, Check, Plus, Trash2, ArrowRight
 } from "lucide-react";
 import { getStoredDoctors, logAuditEvent, completePatientEncounterSync, addLabOrderFromEncounter } from "@/lib/store";
+import { supabase } from "@/lib/supabase/client";
 
 // Doctor to Poli mapping (mirrors AppointmentsView)
 const DOCTOR_MAP: Record<string, { poli: string; keywords: string[] }> = {
@@ -91,13 +92,27 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
     const docs = getStoredDoctors();
     setDoctorsList(docs);
 
-    // Load registered patients list
-    try {
-      const cachedPatients = localStorage.getItem("clinic_patients_v1");
-      if (cachedPatients) {
-        setRegisteredPatientsList(JSON.parse(cachedPatients));
-      }
-    } catch (e) {}
+    // Load registered patients list from Supabase
+    async function loadPatients() {
+      try {
+        const { data, error } = await supabase.from("patients").select("*").order("created_at", { ascending: false });
+        if (!error && data) {
+          const mapped = data.map((p: any) => ({
+            rm: p.medical_record_number,
+            name: p.full_name,
+            phone: p.phone || "-",
+            gender: p.sex_at_birth || "Laki-laki",
+            age: p.date_of_birth ? new Date().getFullYear() - new Date(p.date_of_birth).getFullYear() : 35,
+            poli: "Poli Umum",
+            doctorName: "dr. Maya Lestari",
+            allergies: [],
+            conditions: []
+          }));
+          setRegisteredPatientsList(mapped);
+        }
+      } catch (e) {}
+    }
+    loadPatients();
 
     // Load queue list for patient selection
     try {

@@ -7,6 +7,25 @@ import {
 } from "lucide-react";
 import { getStoredDoctors, logAuditEvent, completePatientEncounterSync, addLabOrderFromEncounter } from "@/lib/store";
 
+// Doctor to Poli mapping (mirrors AppointmentsView)
+const DOCTOR_MAP: Record<string, { poli: string; keywords: string[] }> = {
+  "dr. Maya Lestari": { poli: "Poli Umum", keywords: ["demam", "flu", "pusing", "batuk", "umum"] },
+  "drg. Sari Dewi": { poli: "Poli Gigi", keywords: ["gigi", "gusi", "behel", "tambal"] },
+  "dr. Ahmad Rizki": { poli: "Poli Jantung", keywords: ["jantung", "dada", "hipertensi", "sesak"] },
+  "dr. Laila Rahmawati": { poli: "Poli Kulit", keywords: ["kulit", "gatal", "jerawat", "ruam", "alergi kulit"] },
+  "dr. Rudi Setiawan": { poli: "Poli Anak", keywords: ["anak", "bayi", "imunisasi", "demam anak"] },
+  "dr. Hendra Kusuma": { poli: "Poli Mata", keywords: ["mata", "katarak", "minus", "penglihatan"] },
+  "dr. Bagus W.": { poli: "Poli Penyakit Dalam", keywords: ["lambung", "maag", "diabetes", "penyakit dalam"] },
+  "dr. Dimas A.": { poli: "Poli Gigi", keywords: ["gigi", "gusi"] },
+  "dr. Ratna Sari": { poli: "Poli Anak", keywords: ["anak"] }
+};
+
+// Helper to auto-sync poli when doctor changes
+const handleDoctorChange = (docName: string, setActivePatient: any) => {
+  const matchedPoli = DOCTOR_MAP[docName]?.poli || "Poli Umum";
+  setActivePatient((prev: any) => ({ ...prev, doctor: docName, poli: matchedPoli }));
+};
+
 const Container = ({ style, ...p }: any) => (
   <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e8f0fe", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", ...style }} {...p} />
 );
@@ -138,9 +157,9 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
         name: foundPatient.name,
         gender: foundPatient.gender || "Laki-laki",
         age: foundPatient.age || 35,
-        poli: "Umum",
+        poli: foundPatient.poli || "Poli Umum",
         queueNo: "Direct",
-        doctor: doctorsList[0]?.name || "dr. Maya Lestari",
+        doctor: foundPatient.doctorName || doctorsList[0]?.name || "dr. Maya Lestari",
         allergies: foundPatient.allergies || [],
         conditions: foundPatient.conditions || []
       });
@@ -469,7 +488,7 @@ export default function EncounterView({ initialPatient, onClearInitialPatient }:
               <p style={{ fontSize: 10, color: "#64748b", margin: 0, fontWeight: 700 }}>Dokter Pemeriksa</p>
               <select 
                 value={activePatient.doctor}
-                onChange={e => setActivePatient({ ...activePatient, doctor: e.target.value })}
+                onChange={e => handleDoctorChange(e.target.value, setActivePatient)}
                 style={{ fontSize: 12.5, fontWeight: 800, color: "#0f172a", border: "none", background: "none", outline: "none", cursor: "pointer" }}>
                 {doctorsList.map(d => (
                   <option key={d.id || d.name} value={d.name}>{d.name}</option>

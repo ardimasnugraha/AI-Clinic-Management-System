@@ -35,107 +35,12 @@ interface PatientsViewProps {
   onStartEncounter?: (patient: { rm: string; name: string }) => void;
 }
 
-const DEFAULT_PATIENTS: PatientItem[] = [
-  {
-    rm: "RM000123",
-    name: "Andi Pratama",
-    nik: "3175071505960001",
-    dob: "15 Mei 1996",
-    gender: "Laki-laki",
-    phone: "0812-3456-7890",
-    email: "andi.pratama@mail.com",
-    address: "Jl. Merdeka No. 45, RT 02/RW 01 Semarang, Jawa Tengah 50131",
-    status: "Aktif",
-    religion: "Islam",
-    age: 29,
-    insurance: "BPJS Kesehatan - Aktif",
-    insuranceNo: "0001234567890",
-    emergencyContact: { name: "Ibu Siti Aminah", relation: "Ibu", phone: "0812-1111-2222" },
-    allergies: ["Alergi debu", "Pollen rumput"],
-    privacyConsent: "Disetujui pada 10 Jan 2025",
-    prefComm: "WhatsApp, Email, SMS"
-  },
-  {
-    rm: "RM000124",
-    name: "Siti Nurhaliza",
-    nik: "3175012212920002",
-    dob: "22 Des 1992",
-    gender: "Perempuan",
-    phone: "0813-8765-4321",
-    email: "siti.nurhaliza@mail.com",
-    address: "Jl. Pemuda No. 12 Semarang, Jawa Tengah",
-    status: "Aktif",
-    religion: "Islam",
-    age: 32,
-    insurance: "Mandiri Inhealth",
-    insuranceNo: "9988776655",
-    emergencyContact: { name: "Ahmad Rizki", relation: "Suami", phone: "0813-9999-8888" },
-    allergies: ["Antibiotik Penisilin"],
-    privacyConsent: "Disetujui pada 12 Feb 2025",
-    prefComm: "WhatsApp, Email"
-  },
-  {
-    rm: "RM000125",
-    name: "Budi Santoso",
-    nik: "3175100510880003",
-    dob: "05 Okt 1988",
-    gender: "Laki-laki",
-    phone: "0811-2233-4455",
-    email: "budi.santoso@mail.com",
-    address: "Jl. Diponegoro No. 88 Semarang",
-    status: "Tidak Aktif",
-    religion: "Kristen",
-    age: 36,
-    insurance: "Umum / Bayar Sendiri",
-    insuranceNo: "-",
-    emergencyContact: { name: "Dewi Lestari", relation: "Istri", phone: "0811-5555-6666" },
-    allergies: ["Tidak ada"],
-    privacyConsent: "Disetujui pada 05 Nov 2024",
-    prefComm: "SMS"
-  },
-  {
-    rm: "RM000126",
-    name: "Dewi Anggraini",
-    nik: "3175021803950004",
-    dob: "18 Mar 1995",
-    gender: "Perempuan",
-    phone: "0821-9988-7766",
-    email: "dewi.anggraini@mail.com",
-    address: "Griya Asri Blok B5 Semarang",
-    status: "Aktif",
-    religion: "Islam",
-    age: 30,
-    insurance: "BPJS Kesehatan - Aktif",
-    insuranceNo: "0009876543210",
-    emergencyContact: { name: "Bambang Anggraini", relation: "Ayah", phone: "0821-4444-3333" },
-    allergies: ["Seafood", "Udang"],
-    privacyConsent: "Disetujui pada 18 Jan 2025",
-    prefComm: "WhatsApp"
-  },
-  {
-    rm: "RM000127",
-    name: "Rudi Hermawan",
-    nik: "3175093012900005",
-    dob: "30 Des 1990",
-    gender: "Laki-laki",
-    phone: "0814-5566-7788",
-    email: "rudi.hermawan@mail.com",
-    address: "Taman Gajah Mada No. 10 Semarang",
-    status: "Aktif",
-    religion: "Islam",
-    age: 34,
-    insurance: "Prudential Health",
-    insuranceNo: "PRU-887766",
-    emergencyContact: { name: "Maya Hermawan", relation: "Istri", phone: "0814-2222-1111" },
-    allergies: ["Tidak ada"],
-    privacyConsent: "Disetujui pada 20 Des 2024",
-    prefComm: "WhatsApp, Email"
-  }
+// No default patients defined (removed dummy data)
 ];
 
 export default function PatientsView({ onMakeAppointment, onStartEncounter }: PatientsViewProps) {
-  const [patients, setPatients] = useState<PatientItem[]>(DEFAULT_PATIENTS);
-  const [selectedPatient, setSelectedPatient] = useState<PatientItem>(DEFAULT_PATIENTS[0]);
+  const [patients, setPatients] = useState<PatientItem[]>([]);
+  const [selectedPatient, setSelectedPatient] = useState<PatientItem | null>(null);
   const [activeMenuRm, setActiveMenuRm] = useState<string | null>(null);
 
   // Filters State
@@ -166,7 +71,7 @@ export default function PatientsView({ onMakeAppointment, onStartEncounter }: Pa
   const [duplicateCheck, setDuplicateCheck] = useState<{ match: boolean; score: number; matchPatient: PatientItem | null }>({
     match: true,
     score: 78,
-    matchPatient: DEFAULT_PATIENTS[0]
+    matchPatient: null
   });
 
   // Toast Notification

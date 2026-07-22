@@ -6,6 +6,7 @@ import {
   ChevronRight, Lock, Globe, Smartphone, Plus, Stethoscope, Edit2, Trash2, Check, RefreshCw, AlertTriangle
 } from "lucide-react";
 import { Doctor, getStoredDoctors, saveStoredDoctors, addStoredDoctor, resetAllData } from "@/lib/store";
+import { supabase } from "@/lib/supabase/client";
 
 const Container = ({ style, ...p }: any) => (
   <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e8f0fe", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", ...style }} {...p} />
@@ -27,6 +28,7 @@ export default function SettingsView() {
   const [showAddDoctorModal, setShowAddDoctorModal] = useState(false);
   const [editingDoctor, setEditingDoctor] = useState<Doctor | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [patients, setPatients] = useState<any[]>([]);
 
   // Form State for Add/Edit Doctor
   const [docForm, setDocForm] = useState({
@@ -45,7 +47,26 @@ export default function SettingsView() {
 
   useEffect(() => {
     setDoctors(getStoredDoctors());
+
+    async function loadPatients() {
+      const { data, error } = await supabase.from("patients").select("*").order("medical_record_number", { ascending: true });
+      if (!error) setPatients(data || []);
+    }
+    loadPatients();
   }, []);
+
+  const handleDeletePatient = async (rm: string) => {
+    if (!confirm(`Yakin menghapus data pasien RM: ${rm} secara permanen?`)) return;
+    try {
+      const { error } = await supabase.from("patients").delete().eq("medical_record_number", rm);
+      if (error) throw error;
+      setPatients(p => p.filter(pat => pat.medical_record_number !== rm));
+      showToast("Data Pasien berhasil dihapus dari Supabase.");
+    } catch (e) {
+      console.error(e);
+      alert("Gagal menghapus pasien dari Supabase.");
+    }
+  };
 
   const handleSaveSettings = () => {
     setSaved(true);
@@ -283,6 +304,47 @@ export default function SettingsView() {
                 <p style={{ fontSize: 12, color: "#64748b", margin: 0 }}>
                   Aplikasi aktif menggunakan <strong>Supabase Cloud & Unified LocalStorage Store</strong>. Seluruh data transaksi tersimpan secara persisten.
                 </p>
+              </div>
+
+              {/* Patient Data Management */}
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 18, marginBottom: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                  <User style={{ width: 20, height: 20, color: "#0d9488" }} />
+                  <h4 style={{ fontSize: 14, fontWeight: 800, color: "#0f172a", margin: 0 }}>Data Pasien di Supabase</h4>
+                </div>
+                <div style={{ overflowX: "auto", maxHeight: 300 }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                    <thead style={{ position: "sticky", top: 0, background: "#f8fafc", zIndex: 10 }}>
+                      <tr style={{ borderBottom: "1px solid #e2e8f0" }}>
+                        <th style={{ padding: "10px", textAlign: "left", fontWeight: 700, color: "#475569" }}>RM</th>
+                        <th style={{ padding: "10px", textAlign: "left", fontWeight: 700, color: "#475569" }}>Nama Lengkap</th>
+                        <th style={{ padding: "10px", textAlign: "left", fontWeight: 700, color: "#475569" }}>NIK</th>
+                        <th style={{ padding: "10px", textAlign: "center", fontWeight: 700, color: "#475569" }}>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {patients.map(p => (
+                        <tr key={p.medical_record_number} style={{ borderBottom: "1px solid #e2e8f0" }}>
+                          <td style={{ padding: "10px", color: "#0f172a", fontWeight: 600 }}>{p.medical_record_number}</td>
+                          <td style={{ padding: "10px", color: "#334155" }}>{p.full_name}</td>
+                          <td style={{ padding: "10px", color: "#64748b" }}>{p.nik}</td>
+                          <td style={{ padding: "10px", textAlign: "center" }}>
+                            <button 
+                              onClick={() => handleDeletePatient(p.medical_record_number)}
+                              style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #fecaca", background: "#fef2f2", fontSize: 11, fontWeight: 700, color: "#dc2626", cursor: "pointer" }}>
+                              Hapus
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {patients.length === 0 && (
+                        <tr>
+                          <td colSpan={4} style={{ padding: "20px", textAlign: "center", color: "#94a3b8" }}>Belum ada data pasien di Supabase.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               {/* Reset Data Danger Zone */}

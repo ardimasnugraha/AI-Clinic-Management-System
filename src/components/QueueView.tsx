@@ -58,7 +58,8 @@ const statusBadge = (s: string) => {
     menunggu: ["#c2410c", "#fff7ed", "Menunggu"],
     dibatalkan: ["#dc2626", "#fef2f2", "Dibatalkan"],
   };
-  const [c, b, label] = m[s.toLowerCase()] || ["#64748b", "#f1f5f9", s];
+  const safeStatus = (s || "").toLowerCase();
+  const [c, b, label] = m[safeStatus] || ["#64748b", "#f1f5f9", s || ""];
   return (
     <span style={{ background: b, color: c, borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4 }}>
       <span style={{ width: 6, height: 6, borderRadius: "50%", background: c }} />
@@ -330,14 +331,20 @@ export default function QueueView() {
   };
 
   // Filter Logic
-  const filteredQueue = queueList.filter(q => {
+  const filteredQueue = (queueList || []).filter(q => {
+    if (!q) return false;
+    const nameStr = q.name || "";
+    const noStr = q.no || "";
+    const poliStr = q.poli || "";
+    const statusStr = q.status || "";
+
     const matchSearch = 
-      q.name.toLowerCase().includes(search.toLowerCase()) ||
-      q.no.toLowerCase().includes(search.toLowerCase()) ||
-      q.poli.toLowerCase().includes(search.toLowerCase());
+      nameStr.toLowerCase().includes((search || "").toLowerCase()) ||
+      noStr.toLowerCase().includes((search || "").toLowerCase()) ||
+      poliStr.toLowerCase().includes((search || "").toLowerCase());
     
-    const matchStatus = selFilter === "Semua" || q.status === selFilter.toLowerCase();
-    const matchPoli = selPoliFilter === "Semua" || q.poli === selPoliFilter;
+    const matchStatus = selFilter === "Semua" || statusStr === selFilter.toLowerCase();
+    const matchPoli = selPoliFilter === "Semua" || poliStr === selPoliFilter;
 
     return matchSearch && matchStatus && matchPoli;
   });
@@ -564,10 +571,10 @@ export default function QueueView() {
                       <td style={{ padding: "12px 16px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                           <div style={{ width: 30, height: 30, borderRadius: "50%", background: q.color || "#0d9488", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#fff", flexShrink: 0 }}>
-                            {q.avatar || q.name.split(" ").map(w => w[0]).slice(0, 2).join("")}
+                            {q.avatar || (q.name || "Pasien").split(" ").map(w => w[0]).slice(0, 2).join("")}
                           </div>
                           <div>
-                            <div style={{ fontWeight: 700, color: "#0f172a", fontSize: 13 }}>{q.name}</div>
+                            <div style={{ fontWeight: 700, color: "#0f172a", fontSize: 13 }}>{q.name || "Pasien"}</div>
                             <div style={{ fontSize: 10.5, color: "#64748b" }}>{q.patientId || "RM-"}</div>
                           </div>
                         </div>

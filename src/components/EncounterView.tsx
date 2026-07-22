@@ -364,8 +364,14 @@ const fetchPatientInfo = async (rm: string) => {
 
     // 1. Create Invoice in Billing Store
     const rxSubtotal = prescriptions.reduce((acc, p) => acc + (p.harga || 12000), 0);
-    const isBPJS = activePatient.insurance.toLowerCase().includes("bpjs");
-    const consultationFee = isBPJS ? 0 : 50000;
+    const insLower = (activePatient.insurance || "").toLowerCase();
+    const isInsurance = 
+      insLower.includes("bpjs") || 
+      insLower.includes("inhealth") || 
+      insLower.includes("prudential") || 
+      (insLower.length > 0 && !insLower.includes("umum") && !insLower.includes("bayar sendiri") && !insLower.includes("pribadi"));
+
+    const consultationFee = isInsurance ? 0 : 50000;
     const totalAmount = consultationFee + rxSubtotal;
 
     try {
@@ -374,6 +380,7 @@ const fetchPatientInfo = async (rm: string) => {
         patientRm: activePatient.rm,
         patientName: activePatient.name,
         doctorName: activePatient.doctor,
+        insurance: activePatient.insurance || "Umum / Bayar Sendiri",
         date: new Date().toISOString().split("T")[0],
         items: [
           ...(consultationFee > 0 ? [{ name: `Jasa Konsultasi Dokter (${activePatient.doctor})`, category: "Konsultasi", amount: consultationFee }] : []),

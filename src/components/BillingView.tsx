@@ -13,6 +13,7 @@ export interface Invoice {
   patientRm: string;
   patientName: string;
   doctorName: string;
+  insurance?: string;
   date: string;
   items: Array<{ name: string; category: string; amount: number }>;
   subtotal: number;
@@ -267,59 +268,91 @@ export default function BillingView() {
       )}
 
       {/* INVOICE / RECEIPT DETAIL MODAL */}
-      {selectedInvoice && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <Container style={{ width: 440, padding: 26, background: "#fff" }}>
-            <div style={{ borderBottom: "2px stroke #0f172a", paddingBottom: 12, marginBottom: 16, textAlign: "center" }}>
-              <h3 style={{ fontSize: 16, fontWeight: 900, color: "#0f172a", margin: 0 }}>Klinik Sehat Sentosa</h3>
-              <p style={{ fontSize: 11, color: "#64748b", margin: "2px 0 0" }}>KUITANSI PEMBAYARAN RESMI</p>
-              <p style={{ fontSize: 10, color: "#94a3b8" }}>No: {selectedInvoice.id}</p>
-            </div>
+      {selectedInvoice && (() => {
+        const insName = selectedInvoice.insurance || "Umum / Bayar Sendiri";
+        const insLower = insName.toLowerCase();
+        const isInsPatient = 
+          insLower.includes("bpjs") || 
+          insLower.includes("inhealth") || 
+          insLower.includes("prudential") || 
+          (insLower.length > 0 && !insLower.includes("umum") && !insLower.includes("bayar sendiri") && !insLower.includes("pribadi"));
 
-            <div style={{ fontSize: 12, marginBottom: 16, display: "flex", flexDirection: "column", gap: 4 }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#64748b" }}>Nama Pasien:</span>
-                <strong>{selectedInvoice.patientName} ({selectedInvoice.patientRm})</strong>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#64748b" }}>Dokter:</span>
-                <span>{selectedInvoice.doctorName}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#64748b" }}>Tanggal:</span>
-                <span>{selectedInvoice.date}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#64748b" }}>Metode Bayar:</span>
-                <strong>{selectedInvoice.paymentMethod || "Tunai"}</strong>
-              </div>
-            </div>
+        const displayItems = selectedInvoice.items.filter(item => {
+          if (item.amount <= 0) return false;
+          if (isInsPatient && item.name.toLowerCase().includes("konsultasi")) return false;
+          return true;
+        });
 
-            {/* Rincian Items */}
-            <div style={{ borderTop: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0", padding: "10px 0", marginBottom: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#64748b", marginBottom: 6 }}>RINCIAN ITEM TAGIHAN:</div>
-              {selectedInvoice.items.filter(item => item.amount > 0).map((item, idx) => (
-                <div key={idx} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-                  <span style={{ color: "#334155" }}>{item.name}</span>
-                  <span style={{ fontWeight: 700 }}>Rp {item.amount.toLocaleString("id-ID")}</span>
+        return (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+            <Container style={{ width: 440, padding: 26, background: "#fff" }}>
+              <div style={{ borderBottom: "2px solid #0f172a", paddingBottom: 12, marginBottom: 16, textAlign: "center" }}>
+                <h3 style={{ fontSize: 16, fontWeight: 900, color: "#0f172a", margin: 0 }}>Klinik Sehat Sentosa</h3>
+                <p style={{ fontSize: 11, color: "#64748b", margin: "2px 0 0" }}>KUITANSI PEMBAYARAN RESMI</p>
+                <p style={{ fontSize: 10, color: "#94a3b8", margin: "1px 0 0" }}>No: {selectedInvoice.id}</p>
+              </div>
+
+              <div style={{ fontSize: 12, marginBottom: 16, display: "flex", flexDirection: "column", gap: 4 }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "#64748b" }}>Nama Pasien:</span>
+                  <strong>{selectedInvoice.patientName} ({selectedInvoice.patientRm})</strong>
                 </div>
-              ))}
-            </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "#64748b" }}>Jenis Pasien / Asuransi:</span>
+                  <strong style={{ color: isInsPatient ? "#0284c7" : "#0f172a" }}>{insName}</strong>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "#64748b" }}>Dokter:</span>
+                  <span>{selectedInvoice.doctorName}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "#64748b" }}>Tanggal:</span>
+                  <span>{selectedInvoice.date}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "#64748b" }}>Metode Bayar:</span>
+                  <strong>{selectedInvoice.paymentMethod || "Tunai"}</strong>
+                </div>
 
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 900, color: "#0d9488", marginBottom: 20 }}>
-              <span>TOTAL BAYAR:</span>
-              <span>Rp {selectedInvoice.total.toLocaleString("id-ID")}</span>
-            </div>
+                {isInsPatient && (
+                  <div style={{ background: "#e0f2fe", color: "#0369a1", padding: "6px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700, marginTop: 4 }}>
+                    ✓ Penjamin: {insName} (Jasa Konsultasi Dokter Ditanggung Asuransi)
+                  </div>
+                )}
+              </div>
 
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setSelectedInvoice(null)} style={{ flex: 1, padding: "9px 0", borderRadius: 10, border: "1px solid #cbd5e1", background: "#fff", fontSize: 12, fontWeight: 700 }}>Tutup</button>
-              <button onClick={() => window.print()} style={{ flex: 2, padding: "9px 0", borderRadius: 10, border: "none", background: "#0d9488", color: "#fff", fontSize: 12, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                <Printer style={{ width: 14, height: 14 }} /> Cetak Kuitansi
-              </button>
-            </div>
-          </Container>
-        </div>
-      )}
+              {/* Rincian Items */}
+              <div style={{ borderTop: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0", padding: "10px 0", marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: "#64748b", marginBottom: 6 }}>RINCIAN ITEM TAGIHAN:</div>
+                {displayItems.length === 0 ? (
+                  <div style={{ fontSize: 12, color: "#94a3b8", fontStyle: "italic", textAlign: "center", padding: "6px 0" }}>
+                    (Tidak ada item tagihan berbayar - tercover asuransi)
+                  </div>
+                ) : (
+                  displayItems.map((item, idx) => (
+                    <div key={idx} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                      <span style={{ color: "#334155" }}>{item.name}</span>
+                      <span style={{ fontWeight: 700 }}>Rp {item.amount.toLocaleString("id-ID")}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 900, color: "#0d9488", marginBottom: 20 }}>
+                <span>TOTAL BAYAR:</span>
+                <span>Rp {selectedInvoice.total.toLocaleString("id-ID")}</span>
+              </div>
+
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={() => setSelectedInvoice(null)} style={{ flex: 1, padding: "9px 0", borderRadius: 10, border: "1px solid #cbd5e1", background: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Tutup</button>
+                <button onClick={() => window.print()} style={{ flex: 2, padding: "9px 0", borderRadius: 10, border: "none", background: "#0d9488", color: "#fff", fontSize: 12, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer" }}>
+                  <Printer style={{ width: 14, height: 14 }} /> Cetak Kuitansi
+                </button>
+              </div>
+            </Container>
+          </div>
+        );
+      })()}
     </div>
   );
 }

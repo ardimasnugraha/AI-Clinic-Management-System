@@ -310,6 +310,52 @@ export const addQueueTicketDirect = async (patient: { rm: string; name: string; 
   }
 };
 
+export const completePaymentAutoFinish = async (patientName: string, patientRm?: string) => {
+  if (typeof window === "undefined") return;
+
+  // 1. Update Appointments LocalStorage & Supabase
+  try {
+    const cachedApts = localStorage.getItem("clinic_appointments_v1");
+    if (cachedApts) {
+      const apts = JSON.parse(cachedApts);
+      const updatedApts = apts.map((a: any) => {
+        const matchName = (a.patientName || a.name || "").toLowerCase() === patientName.toLowerCase();
+        const matchRm = patientRm && (a.patientRm || a.patientId || "") === patientRm;
+        if (matchName || matchRm) {
+          return { ...a, status: "Selesai" };
+        }
+        return a;
+      });
+      localStorage.setItem("clinic_appointments_v1", JSON.stringify(updatedApts));
+    }
+  } catch (e) {}
+
+  try {
+    await supabase.from("appointments").update({ status: "selesai" }).or(`patient_name.ilike.${patientName},patient_id.eq.${patientRm || ""}`);
+  } catch (e) {}
+
+  // 2. Update Queue LocalStorage & Supabase
+  try {
+    const cachedQueue = localStorage.getItem("clinic_queue_v1");
+    if (cachedQueue) {
+      const queues = JSON.parse(cachedQueue);
+      const updatedQueues = queues.map((q: any) => {
+        const matchName = (q.name || q.patientName || "").toLowerCase() === patientName.toLowerCase();
+        const matchRm = patientRm && (q.patientId || q.patientRm || "") === patientRm;
+        if (matchName || matchRm) {
+          return { ...q, status: "selesai" };
+        }
+        return q;
+      });
+      localStorage.setItem("clinic_queue_v1", JSON.stringify(updatedQueues));
+    }
+  } catch (e) {}
+
+  try {
+    await supabase.from("queues").update({ status: "selesai" }).or(`patient_name.ilike.${patientName},patient_rm.eq.${patientRm || ""}`);
+  } catch (e) {}
+};
+
 export const resetAllData = () => {
   if (typeof window === "undefined") return;
   localStorage.removeItem("clinic_patients_v1");

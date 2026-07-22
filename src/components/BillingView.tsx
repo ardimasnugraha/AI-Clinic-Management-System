@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Receipt, Plus, Search, CircleDollarSign, CheckCircle2, Clock, AlertTriangle, Download, CreditCard, Printer, Check, Eye } from "lucide-react";
-import { logAuditEvent } from "@/lib/store";
+import { logAuditEvent, completePaymentAutoFinish } from "@/lib/store";
 import { supabase } from "@/lib/supabase/client";
 
 const Container = ({ style, ...p }: any) => (
@@ -98,6 +98,9 @@ export default function BillingView() {
         payment_method: payMethod
       }).or(`invoice_no.eq.${showPayModal.id},id.eq.${showPayModal.id}`);
     } catch (e) {}
+
+    // Auto-update Appointment & Queue status to Selesai
+    await completePaymentAutoFinish(showPayModal.patientName, showPayModal.patientRm);
 
     showToast(`Pembayaran Tagihan ${showPayModal.id} sebesar Rp ${showPayModal.total.toLocaleString("id-ID")} berhasil (Metode: ${payMethod})`);
     logAuditEvent("Proses Pembayaran Kasir", "Billing", `Pembayaran Lunas INV ${showPayModal.id} pasien ${showPayModal.patientName} via ${payMethod}`);

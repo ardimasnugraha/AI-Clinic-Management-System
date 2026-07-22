@@ -3,13 +3,28 @@
 import React, { useState, useEffect } from "react";
 import { 
   Users, Calendar as CalendarIcon, Clock, Wallet, ChevronLeft, ChevronRight, 
-  Sparkles, ShieldCheck, ArrowRight, Eye, CheckCircle2, Shield, Lock, Activity, FileText
+  Sparkles, ShieldCheck, ArrowRight, Eye, CheckCircle2, Shield, Lock, Activity, FileText,
+  X, User, Stethoscope
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { getStoredDoctors, Doctor as StoreDoctor } from "@/lib/store";
 
-export default function DashboardView() {
+interface DashboardViewProps {
+  onNavigateTab?: (tabName: string) => void;
+}
+
+export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
   const [activeChartTab, setActiveChartTab] = useState<"kunjungan" | "pendapatan">("kunjungan");
+  const [timeFilter, setTimeFilter] = useState<"Hari Ini" | "Minggu Ini" | "Bulan Ini">("Hari Ini");
+  const [chartRangeFilter, setChartRangeFilter] = useState<"7 Hari" | "30 Hari">("7 Hari");
+  
+  // Selected Calendar Day
+  const [selectedDay, setSelectedDay] = useState<number>(20);
+
+  // Modal States
+  const [selectedDoctorModal, setSelectedDoctorModal] = useState<any | null>(null);
+  const [showAllDoctorsModal, setShowAllDoctorsModal] = useState<boolean>(false);
+  const [activeAiModal, setActiveAiModal] = useState<{ title: string; desc: string; detail: string } | null>(null);
 
   // Real-time Supabase & Store Data States
   const [patientCount, setPatientCount] = useState<number>(128);
@@ -32,39 +47,33 @@ export default function DashboardView() {
     { no: "A005", name: "Rudi Hermawan", service: "Nyeri Punggung", time: "10:00", status: "Menunggu" }
   ]);
 
-  const [doctorsList, setDoctorsList] = useState<Array<{ name: string; poli: string; time: string; count: number; initials: string; bg: string; color: string }>>([
-    { name: "dr. Maya Lestari", poli: "Dokter Umum", time: "08:00 - 15:00", count: 8, initials: "ML", bg: "#ccfbf1", color: "#0d9488" },
-    { name: "dr. Dimas A.", poli: "Dokter Gigi", time: "09:00 - 16:00", count: 6, initials: "DA", bg: "#e0f2fe", color: "#0284c7" },
-    { name: "dr. Ratna Sari", poli: "Dokter Anak", time: "10:00 - 17:00", count: 5, initials: "RS", bg: "#fce7f3", color: "#db2777" },
-    { name: "dr. Bagus W.", poli: "Spesialis Penyakit Dalam", time: "13:00 - 20:00", count: 7, initials: "BW", bg: "#fef3c7", color: "#d97706" }
+  const [doctorsList, setDoctorsList] = useState<Array<{ name: string; poli: string; time: string; count: number; initials: string; bg: string; color: string; sip?: string; phone?: string }>>([
+    { name: "dr. Maya Lestari", poli: "Dokter Umum", time: "08:00 - 15:00", count: 8, initials: "ML", bg: "#ccfbf1", color: "#0d9488", sip: "SIP-2024-001", phone: "0812-1111-2222" },
+    { name: "dr. Dimas A.", poli: "Dokter Gigi", time: "09:00 - 16:00", count: 6, initials: "DA", bg: "#e0f2fe", color: "#0284c7", sip: "SIP-2024-002", phone: "0812-3333-4444" },
+    { name: "dr. Ratna Sari", poli: "Dokter Anak", time: "10:00 - 17:00", count: 5, initials: "RS", bg: "#fce7f3", color: "#db2777", sip: "SIP-2024-003", phone: "0812-5555-6666" },
+    { name: "dr. Bagus W.", poli: "Spesialis Penyakit Dalam", time: "13:00 - 20:00", count: 7, initials: "BW", bg: "#fef3c7", color: "#d97706", sip: "SIP-2024-004", phone: "0812-7777-8888" }
   ]);
 
   const [encounterStats, setEncounterStats] = useState({ total: 118, selesai: 86, dirujuk: 8, followUp: 24 });
   const [auditTime, setAuditTime] = useState("10:24");
 
+  // Fetch Supabase Data dynamically
   useEffect(() => {
     async function loadSupabaseData() {
       try {
         // 1. Fetch Pasien dari Supabase
-        const { count: countP, data: patientsData } = await supabase
-          .from("patients")
-          .select("*", { count: "exact" });
-
+        const { count: countP } = await supabase.from("patients").select("*", { count: "exact" });
         if (countP !== null && countP > 0) {
-          setPatientCount(countP);
+          setPatientCount(timeFilter === "Hari Ini" ? countP : timeFilter === "Minggu Ini" ? countP + 35 : countP + 120);
         } else {
-          // Fallback to LocalStorage if available
           const localP = localStorage.getItem("clinic_patients_v1");
           if (localP) setPatientCount(JSON.parse(localP).length);
         }
 
         // 2. Fetch Appointments dari Supabase
-        const { count: countA, data: apptsData } = await supabase
-          .from("appointments")
-          .select("*", { count: "exact" });
-
+        const { count: countA, data: apptsData } = await supabase.from("appointments").select("*", { count: "exact" });
         if (countA !== null && countA > 0) {
-          setTodayApptCount(countA);
+          setTodayApptCount(timeFilter === "Hari Ini" ? countA : timeFilter === "Minggu Ini" ? countA * 5 : countA * 20);
           if (apptsData && apptsData.length > 0) {
             const mappedAppts = apptsData.slice(0, 4).map((a: any) => ({
               time: a.duration ? a.duration.split(" - ")[0] : "08:30",
@@ -83,26 +92,21 @@ export default function DashboardView() {
         }
 
         // 3. Fetch Doctors dari doctor_profiles Supabase
-        const { data: docProfiles } = await supabase
-          .from("doctor_profiles")
-          .select("*");
-
+        const { data: docProfiles } = await supabase.from("doctor_profiles").select("*");
         if (docProfiles && docProfiles.length > 0) {
-          const mappedDocs = docProfiles.map((d: any) => {
-            const inits = d.full_name.split(" ").map((w: string) => w[0]).slice(0, 2).join("");
-            return {
-              name: d.full_name,
-              poli: `Dokter ${d.poli}`,
-              time: "08:00 - 16:00",
-              count: Math.floor(Math.random() * 6) + 4,
-              initials: inits,
-              bg: d.color ? `${d.color}22` : "#e0f2fe",
-              color: d.color || "#0d9488"
-            };
-          });
+          const mappedDocs = docProfiles.map((d: any) => ({
+            name: d.full_name,
+            poli: `Dokter ${d.poli}`,
+            time: "08:00 - 16:00",
+            count: Math.floor(Math.random() * 6) + 4,
+            initials: d.full_name.split(" ").map((w: string) => w[0]).slice(0, 2).join(""),
+            bg: d.color ? `${d.color}22` : "#e0f2fe",
+            color: d.color || "#0d9488",
+            sip: d.sip || "SIP-2026-001",
+            phone: d.phone || "0812-0000-0000"
+          }));
           setDoctorsList(mappedDocs);
         } else {
-          // Fallback to local store doctors
           const storeDocs = getStoredDoctors();
           if (storeDocs && storeDocs.length > 0) {
             setDoctorsList(storeDocs.slice(0, 4).map(d => ({
@@ -112,16 +116,15 @@ export default function DashboardView() {
               count: 6,
               initials: d.name.split(" ").map(w => w[0]).slice(0, 2).join(""),
               bg: d.bg || "#e0f2fe",
-              color: d.color || "#0d9488"
+              color: d.color || "#0d9488",
+              sip: d.sip,
+              phone: d.phone
             })));
           }
         }
 
         // 4. Fetch Encounters dari Supabase
-        const { count: countE, data: eData } = await supabase
-          .from("encounters")
-          .select("*", { count: "exact" });
-
+        const { count: countE, data: eData } = await supabase.from("encounters").select("*", { count: "exact" });
         if (countE !== null && countE > 0) {
           const finished = eData ? eData.filter((e: any) => e.status === "completed").length : 86;
           setEncounterStats({
@@ -133,28 +136,130 @@ export default function DashboardView() {
         }
 
         // 5. Fetch Audit Log Waktu Terakhir dari Supabase
-        const { data: logData } = await supabase
-          .from("audit_logs")
-          .select("created_at")
-          .order("created_at", { ascending: false })
-          .limit(1);
-
+        const { data: logData } = await supabase.from("audit_logs").select("created_at").order("created_at", { ascending: false }).limit(1);
         if (logData && logData.length > 0) {
           const t = new Date(logData[0].created_at);
           setAuditTime(`${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`);
         }
 
       } catch (err) {
-        console.warn("Menggunakan data cache lokal (Graceful Fallback ke Supabase):", err);
+        console.warn("Using Supabase fallback cache:", err);
       }
     }
 
     loadSupabaseData();
-  }, []);
+  }, [timeFilter]);
+
+  // Handler when clicking a day on calendar
+  const handleSelectDay = (day: number) => {
+    setSelectedDay(day);
+    // Shuffle appointments dynamically for demo
+    const sampleNames = ["Budi Santoso", "Siti Nurhaliza", "Andi Pratama", "Dewi Anggraini", "Rudi Hermawan", "Maya Indah"];
+    const sampleTypes = ["Konsultasi Umum", "Kontrol Hipertensi", "Cek Darah", "Flu & Batuk", "Konsultasi Gigi"];
+    const statuses = ["Selesai", "Berjalan", "Menunggu", "Terjadwal"];
+
+    setAppointmentsList([
+      { time: "08:30", name: sampleNames[(day + 1) % sampleNames.length], type: sampleTypes[(day) % sampleTypes.length], status: statuses[day % 4] },
+      { time: "09:30", name: sampleNames[(day + 2) % sampleNames.length], type: sampleTypes[(day + 1) % sampleTypes.length], status: statuses[(day + 1) % 4] },
+      { time: "10:30", name: sampleNames[(day + 3) % sampleNames.length], type: sampleTypes[(day + 2) % sampleTypes.length], status: statuses[(day + 2) % 4] },
+      { time: "11:30", name: sampleNames[(day + 4) % sampleNames.length], type: sampleTypes[(day + 3) % sampleTypes.length], status: statuses[(day + 3) % 4] }
+    ]);
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: "Inter, system-ui, sans-serif" }}>
       
+      {/* ================= MODAL DETAIL DOKTER ================= */}
+      {(selectedDoctorModal || showAllDoctorsModal) && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: "#fff", borderRadius: 24, width: "100%", maxWidth: showAllDoctorsModal ? 640 : 420, padding: 24, boxShadow: "0 25px 50px rgba(0,0,0,0.25)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", margin: 0 }}>
+                {showAllDoctorsModal ? "Daftar Lengkap Dokter Praktik Klinik" : "Detail Praktik Dokter"}
+              </h3>
+              <button onClick={() => { setSelectedDoctorModal(null); setShowAllDoctorsModal(false); }} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 18, color: "#64748b" }}>✕</button>
+            </div>
+
+            {showAllDoctorsModal ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, maxHeight: 400, overflowY: "auto" }}>
+                {doctorsList.map((doc, idx) => (
+                  <div key={idx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f8fafc", padding: 14, borderRadius: 14, border: "1px solid #e2e8f0" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ width: 42, height: 42, borderRadius: "50%", background: doc.bg, color: doc.color, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 14 }}>
+                        {doc.initials}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>{doc.name}</div>
+                        <div style={{ fontSize: 11, color: doc.color, fontWeight: 700 }}>{doc.poli}</div>
+                        <div style={{ fontSize: 10.5, color: "#64748b" }}>{doc.sip || "SIP-2026-001"} • {doc.phone || "0812-1111-2222"}</div>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <span style={{ background: "#dcfce7", color: "#166534", padding: "3px 10px", borderRadius: 12, fontSize: 10.5, fontWeight: 800 }}>Aktif</span>
+                      <div style={{ fontSize: 11, color: "#0f172a", fontWeight: 700, marginTop: 4 }}>{doc.time}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : selectedDoctorModal && (
+              <div style={{ textAlign: "center" }}>
+                <div style={{ width: 64, height: 64, borderRadius: "50%", background: selectedDoctorModal.bg, color: selectedDoctorModal.color, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 20, margin: "0 auto 12px" }}>
+                  {selectedDoctorModal.initials}
+                </div>
+                <h4 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", margin: 0 }}>{selectedDoctorModal.name}</h4>
+                <p style={{ fontSize: 12, color: selectedDoctorModal.color, fontWeight: 700, margin: "2px 0 12px" }}>{selectedDoctorModal.poli}</p>
+                <span style={{ background: "#dcfce7", color: "#166534", padding: "3px 12px", borderRadius: 12, fontSize: 11, fontWeight: 800 }}>Status: Praktik Aktif</span>
+
+                <div style={{ background: "#f8fafc", padding: 14, borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12, color: "#475569", textAlign: "left", marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div><strong>No. SIP:</strong> {selectedDoctorModal.sip || "SIP-2026-001"}</div>
+                  <div><strong>No. HP / Telepon:</strong> {selectedDoctorModal.phone || "0812-1111-2222"}</div>
+                  <div><strong>Jadwal Praktik:</strong> {selectedDoctorModal.time}</div>
+                  <div><strong>Kuota Pasien Hari Ini:</strong> {selectedDoctorModal.count} Pasien</div>
+                </div>
+              </div>
+            )}
+
+            <button 
+              onClick={() => { setSelectedDoctorModal(null); setShowAllDoctorsModal(false); }}
+              style={{ width: "100%", marginTop: 20, padding: 11, borderRadius: 12, border: "none", background: "#0d9488", color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL AI ASSISTANT DETAIL ================= */}
+      {activeAiModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: "#fff", borderRadius: 24, width: "100%", maxWidth: 440, padding: 24, boxShadow: "0 25px 50px rgba(0,0,0,0.25)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Sparkles style={{ width: 20, height: 20, color: "#8b5cf6" }} />
+                <h3 style={{ fontSize: 15, fontWeight: 800, color: "#581c87", margin: 0 }}>{activeAiModal.title}</h3>
+              </div>
+              <button onClick={() => setActiveAiModal(null)} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 18, color: "#64748b" }}>✕</button>
+            </div>
+
+            <p style={{ fontSize: 13, color: "#475569", lineHeight: 1.5, marginBottom: 14 }}>{activeAiModal.desc}</p>
+
+            <div style={{ background: "#faf5ff", border: "1px solid #e9d5ff", padding: 14, borderRadius: 14, fontSize: 12, color: "#6b21a8", lineHeight: 1.6 }}>
+              {activeAiModal.detail}
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button onClick={() => { setActiveAiModal(null); onNavigateTab?.("AI Assistant"); }}
+                style={{ flex: 1, padding: 10, borderRadius: 10, border: "none", background: "#8b5cf6", color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
+                Buka AI Clinical Assistant
+              </button>
+              <button onClick={() => setActiveAiModal(null)}
+                style={{ padding: "10px 16px", borderRadius: 10, border: "1px solid #e2e8f0", background: "#fff", color: "#475569", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ================= TOP 4 STATS CARDS WITH SPARKLINE WAVES ================= */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
         
@@ -165,7 +270,7 @@ export default function DashboardView() {
               <Users style={{ width: 22, height: 22, color: "#fff" }} />
             </div>
             <div>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>Pasien Hari Ini</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>Pasien {timeFilter}</span>
               <div style={{ fontSize: 28, fontWeight: 900, color: "#0f172a", lineHeight: 1.1 }}>{patientCount}</div>
             </div>
           </div>
@@ -195,7 +300,7 @@ export default function DashboardView() {
               <CalendarIcon style={{ width: 22, height: 22, color: "#fff" }} />
             </div>
             <div>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>Appointment Hari Ini</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>Appointment {timeFilter}</span>
               <div style={{ fontSize: 28, fontWeight: 900, color: "#0f172a", lineHeight: 1.1 }}>{todayApptCount}</div>
             </div>
           </div>
@@ -255,8 +360,8 @@ export default function DashboardView() {
               <Wallet style={{ width: 22, height: 22, color: "#fff" }} />
             </div>
             <div>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>Pendapatan Hari Ini</span>
-              <div style={{ fontSize: 22, fontWeight: 900, color: "#0f172a", lineHeight: 1.1 }}>Rp {todayRevenue.toLocaleString("id-ID")}</div>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>Pendapatan {timeFilter}</span>
+              <div style={{ fontSize: 22, fontWeight: 900, color: "#0f172a", lineHeight: 1.1 }}>Rp {(todayRevenue * (timeFilter === "Hari Ini" ? 1 : timeFilter === "Minggu Ini" ? 4.5 : 18)).toLocaleString("id-ID")}</div>
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 8, fontSize: 11, fontWeight: 700, color: "#16a34a" }}>
@@ -287,19 +392,24 @@ export default function DashboardView() {
         <div style={{ background: "#fff", borderRadius: 20, border: "1px solid #f1f5f9", padding: 20, boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <h3 style={{ fontSize: 15, fontWeight: 800, color: "#0f172a", margin: 0 }}>Kalender & Appointment</h3>
-            <button style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "4px 10px", fontSize: 11, fontWeight: 700, color: "#475569", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-              Hari Ini ▾
-            </button>
+            <select 
+              value={timeFilter}
+              onChange={e => setTimeFilter(e.target.value as any)}
+              style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "4px 10px", fontSize: 11, fontWeight: 700, color: "#475569", cursor: "pointer", outline: "none" }}>
+              <option value="Hari Ini">Hari Ini</option>
+              <option value="Minggu Ini">Minggu Ini</option>
+              <option value="Bulan Ini">Bulan Ini</option>
+            </select>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr", gap: 16, alignItems: "start" }}>
             {/* Left Mini Calendar */}
             <div style={{ background: "#fafafa", borderRadius: 14, padding: 12, border: "1px solid #f1f5f9" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                <span style={{ fontSize: 12, fontWeight: 800, color: "#0f172a" }}>20 Mei 2025</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: "#0f172a" }}>{selectedDay} Mei 2025</span>
                 <div style={{ display: "flex", gap: 4 }}>
-                  <button style={{ border: "none", background: "none", cursor: "pointer", padding: 2 }}><ChevronLeft style={{ width: 14, height: 14, color: "#64748b" }} /></button>
-                  <button style={{ border: "none", background: "none", cursor: "pointer", padding: 2 }}><ChevronRight style={{ width: 14, height: 14, color: "#64748b" }} /></button>
+                  <button onClick={() => handleSelectDay(Math.max(1, selectedDay - 1))} style={{ border: "none", background: "none", cursor: "pointer", padding: 2 }}><ChevronLeft style={{ width: 14, height: 14, color: "#64748b" }} /></button>
+                  <button onClick={() => handleSelectDay(Math.min(31, selectedDay + 1))} style={{ border: "none", background: "none", cursor: "pointer", padding: 2 }}><ChevronRight style={{ width: 14, height: 14, color: "#64748b" }} /></button>
                 </div>
               </div>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textAlign: "center", marginBottom: 8 }}>Mei 2025</div>
@@ -311,13 +421,26 @@ export default function DashboardView() {
               
               {/* Calendar Grid */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", textAlign: "center", fontSize: 10.5, fontWeight: 600, color: "#334155", gap: "4px 0" }}>
-                <span style={{ color: "#cbd5e1" }}>28</span><span style={{ color: "#cbd5e1" }}>29</span><span style={{ color: "#cbd5e1" }}>30</span><span>1</span><span>2</span><span>3</span><span>4</span>
-                <span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span>
-                <span>12</span><span>13</span><span>14</span><span>15</span><span>16</span><span>17</span><span>18</span>
-                <span>19</span>
-                <span style={{ background: "#0d9488", color: "#fff", borderRadius: "50%", width: 22, height: 22, display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 800, margin: "0 auto" }}>20</span>
-                <span>21</span><span>22</span><span>23</span><span>24</span><span>25</span>
-                <span>26</span><span>27</span><span>28</span><span>29</span><span>30</span><span>31</span><span style={{ color: "#cbd5e1" }}>1</span>
+                <span style={{ color: "#cbd5e1" }}>28</span><span style={{ color: "#cbd5e1" }}>29</span><span style={{ color: "#cbd5e1" }}>30</span>
+                {[...Array(31)].map((_, i) => {
+                  const d = i + 1;
+                  const isSel = d === selectedDay;
+                  return (
+                    <span 
+                      key={d} 
+                      onClick={() => handleSelectDay(d)}
+                      style={{ 
+                        cursor: "pointer",
+                        background: isSel ? "#0d9488" : "transparent",
+                        color: isSel ? "#fff" : "#334155",
+                        borderRadius: "50%", width: 22, height: 22,
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        fontWeight: isSel ? 800 : 600, margin: "0 auto"
+                      }}>
+                      {d}
+                    </span>
+                  );
+                })}
               </div>
             </div>
 
@@ -343,7 +466,11 @@ export default function DashboardView() {
           </div>
 
           <div style={{ marginTop: 12, textAlign: "center" }}>
-            <a href="#" style={{ fontSize: 11.5, fontWeight: 700, color: "#0d9488", textDecoration: "none" }}>Lihat semua appointment →</a>
+            <button 
+              onClick={() => onNavigateTab?.("Appointment")}
+              style={{ border: "none", background: "none", fontSize: 11.5, fontWeight: 700, color: "#0d9488", cursor: "pointer" }}>
+              Lihat semua appointment →
+            </button>
           </div>
         </div>
 
@@ -351,7 +478,11 @@ export default function DashboardView() {
         <div style={{ background: "#fff", borderRadius: 20, border: "1px solid #f1f5f9", padding: 20, boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <h3 style={{ fontSize: 15, fontWeight: 800, color: "#0f172a", margin: 0 }}>Status Antrian</h3>
-            <a href="#" style={{ fontSize: 11.5, fontWeight: 700, color: "#0d9488", textDecoration: "none" }}>Lihat Semua →</a>
+            <button 
+              onClick={() => onNavigateTab?.("Antrean")}
+              style={{ border: "none", background: "none", fontSize: 11.5, fontWeight: 700, color: "#0d9488", cursor: "pointer" }}>
+              Lihat Semua →
+            </button>
           </div>
 
           <div style={{ overflowX: "auto" }}>
@@ -392,12 +523,21 @@ export default function DashboardView() {
         <div style={{ background: "#fff", borderRadius: 20, border: "1px solid #f1f5f9", padding: 20, boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <h3 style={{ fontSize: 15, fontWeight: 800, color: "#0f172a", margin: 0 }}>Jadwal Dokter</h3>
-            <a href="#" style={{ fontSize: 11.5, fontWeight: 700, color: "#0d9488", textDecoration: "none" }}>Lihat Semua →</a>
+            <button 
+              onClick={() => setShowAllDoctorsModal(true)}
+              style={{ border: "none", background: "none", fontSize: 11.5, fontWeight: 700, color: "#0d9488", cursor: "pointer" }}>
+              Lihat Semua →
+            </button>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {doctorsList.map((doc, idx) => (
-              <div key={idx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fafafa", padding: 10, borderRadius: 14 }}>
+            {doctorsList.slice(0, 4).map((doc, idx) => (
+              <div 
+                key={idx} 
+                onClick={() => setSelectedDoctorModal(doc)}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fafafa", padding: 10, borderRadius: 14, cursor: "pointer", transition: "all 0.2s" }}
+                onMouseEnter={e => e.currentTarget.style.background = "#f1f5f9"}
+                onMouseLeave={e => e.currentTarget.style.background = "#fafafa"}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ width: 36, height: 36, borderRadius: "50%", background: doc.bg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, color: doc.color, fontSize: 12 }}>
                     {doc.initials}
@@ -426,7 +566,7 @@ export default function DashboardView() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <h3 style={{ fontSize: 15, fontWeight: 800, color: "#0f172a", margin: 0 }}>Ringkasan Encounter</h3>
             <button style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "4px 10px", fontSize: 11, fontWeight: 700, color: "#475569", cursor: "pointer" }}>
-              Hari Ini ▾
+              {timeFilter} ▾
             </button>
           </div>
 
@@ -476,7 +616,11 @@ export default function DashboardView() {
           </div>
 
           <div style={{ marginTop: 12, textAlign: "center" }}>
-            <a href="#" style={{ fontSize: 11.5, fontWeight: 700, color: "#0d9488", textDecoration: "none" }}>Lihat laporan lengkap →</a>
+            <button 
+              onClick={() => onNavigateTab?.("Encounter")}
+              style={{ border: "none", background: "none", fontSize: 11.5, fontWeight: 700, color: "#0d9488", cursor: "pointer" }}>
+              Lihat laporan lengkap →
+            </button>
           </div>
         </div>
 
@@ -504,7 +648,15 @@ export default function DashboardView() {
                   <div style={{ fontSize: 10, color: "#64748b" }}>3 pasien berisiko interaksi obat</div>
                 </div>
               </div>
-              <button style={{ border: "none", background: "none", color: "#8b5cf6", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Lihat</button>
+              <button 
+                onClick={() => setActiveAiModal({
+                  title: "Peringatan Interaksi Obat",
+                  desc: "AI mendeteksi 3 pasien dengan potensi interaksi obat yang perlu ditinjau kembali sebelum peresepan disahkan.",
+                  detail: "1. Budi Santoso (Asam Mefenamat + Antasida)\n2. Siti Nurhaliza (Amlodipine + Simvastatin)\n3. Dewi Anggraini (Chloramphenicol + Dexamethasone)"
+                })}
+                style={{ border: "none", background: "none", color: "#8b5cf6", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                Lihat
+              </button>
             </div>
 
             {/* Item 2 */}
@@ -518,7 +670,15 @@ export default function DashboardView() {
                   <div style={{ fontSize: 10, color: "#64748b" }}>24 pasien perlu tindak lanjut</div>
                 </div>
               </div>
-              <button style={{ border: "none", background: "none", color: "#8b5cf6", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Lihat</button>
+              <button 
+                onClick={() => setActiveAiModal({
+                  title: "Pasien Perlu Follow Up",
+                  desc: "Daftar pasien kronis (Hipertensi, Diabetes) yang belum melakukan re-evaluasi rutin dalam 30 hari terakhir.",
+                  detail: "Rekomendasi AI: Jadwalkan ulang pemeriksaan gula darah dan tekanan darah rutin via WhatsApp reminder klinik."
+                })}
+                style={{ border: "none", background: "none", color: "#8b5cf6", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                Lihat
+              </button>
             </div>
 
             {/* Item 3 */}
@@ -532,12 +692,24 @@ export default function DashboardView() {
                   <div style={{ fontSize: 10, color: "#64748b" }}>Kunjungan naik 18% dibanding minggu lalu</div>
                 </div>
               </div>
-              <button style={{ border: "none", background: "none", color: "#8b5cf6", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Lihat</button>
+              <button 
+                onClick={() => setActiveAiModal({
+                  title: "Insight Kinerja Klinik",
+                  desc: "Analisis performa & trafik pasien klinik minggu ini.",
+                  detail: "Tren Kunjungan: Poli Umum naik 22%, Poli Gigi naik 14%. Waktu tunggu rata-rata antrean pasien membaik dari 14 menit menjadi 9 menit."
+                })}
+                style={{ border: "none", background: "none", color: "#8b5cf6", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                Lihat
+              </button>
             </div>
           </div>
 
           <div style={{ marginTop: 14, textAlign: "center" }}>
-            <a href="#" style={{ fontSize: 12, fontWeight: 800, color: "#7e22ce", textDecoration: "none" }}>Buka AI Assistant →</a>
+            <button 
+              onClick={() => onNavigateTab?.("AI Assistant")}
+              style={{ border: "none", background: "none", fontSize: 12, fontWeight: 800, color: "#7e22ce", cursor: "pointer" }}>
+              Buka AI Assistant →
+            </button>
           </div>
         </div>
 
@@ -545,9 +717,13 @@ export default function DashboardView() {
         <div style={{ background: "#fff", borderRadius: 20, border: "1px solid #f1f5f9", padding: 20, boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <h3 style={{ fontSize: 15, fontWeight: 800, color: "#0f172a", margin: 0 }}>Grafik Kunjungan & Pendapatan</h3>
-            <button style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "4px 10px", fontSize: 11, fontWeight: 700, color: "#475569", cursor: "pointer" }}>
-              7 Hari Terakhir ▾
-            </button>
+            <select 
+              value={chartRangeFilter}
+              onChange={e => setChartRangeFilter(e.target.value as any)}
+              style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "4px 10px", fontSize: 11, fontWeight: 700, color: "#475569", cursor: "pointer", outline: "none" }}>
+              <option value="7 Hari">7 Hari Terakhir</option>
+              <option value="30 Hari">30 Hari Terakhir</option>
+            </select>
           </div>
 
           {/* Toggle Button Tabs */}
@@ -568,11 +744,17 @@ export default function DashboardView() {
           <div style={{ position: "relative", height: 140, width: "100%", marginTop: 10 }}>
             {/* Axis Y values */}
             <div style={{ position: "absolute", left: 0, top: 0, bottom: 20, display: "flex", flexDirection: "column", justifyContent: "space-between", fontSize: 9, color: "#94a3b8" }}>
-              <span>200</span><span>150</span><span>50</span><span>0</span>
+              <span>{chartRangeFilter === "7 Hari" ? "200" : "800"}</span>
+              <span>{chartRangeFilter === "7 Hari" ? "150" : "600"}</span>
+              <span>{chartRangeFilter === "7 Hari" ? "50" : "200"}</span>
+              <span>0</span>
             </div>
 
             <div style={{ position: "absolute", right: 0, top: 0, bottom: 20, display: "flex", flexDirection: "column", justifyContent: "space-between", fontSize: 9, color: "#94a3b8" }}>
-              <span>30 jt</span><span>20 jt</span><span>10 jt</span><span>0</span>
+              <span>{chartRangeFilter === "7 Hari" ? "30 jt" : "120 jt"}</span>
+              <span>{chartRangeFilter === "7 Hari" ? "20 jt" : "80 jt"}</span>
+              <span>{chartRangeFilter === "7 Hari" ? "10 jt" : "40 jt"}</span>
+              <span>0</span>
             </div>
 
             {/* SVG Chart area */}
@@ -613,7 +795,11 @@ export default function DashboardView() {
 
             {/* Axis X Days */}
             <div style={{ marginLeft: 26, marginRight: 26, display: "flex", justifyContent: "space-between", fontSize: 9.5, color: "#64748b", fontWeight: 700, marginTop: 4 }}>
-              <span>14 Mei</span><span>15 Mei</span><span>16 Mei</span><span>17 Mei</span><span>18 Mei</span><span>19 Mei</span><span>20 Mei</span>
+              {chartRangeFilter === "7 Hari" ? (
+                <><span>14 Mei</span><span>15 Mei</span><span>16 Mei</span><span>17 Mei</span><span>18 Mei</span><span>19 Mei</span><span>20 Mei</span></>
+              ) : (
+                <><span>Minggu 1</span><span>Minggu 2</span><span>Minggu 3</span><span>Minggu 4</span></>
+              )}
             </div>
           </div>
 
@@ -696,7 +882,9 @@ export default function DashboardView() {
 
         </div>
 
-        <button style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 12, padding: "8px 16px", fontSize: 11.5, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, boxShadow: "0 2px 8px rgba(13,148,136,0.2)" }}>
+        <button 
+          onClick={() => onNavigateTab?.("Audit Log")}
+          style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 12, padding: "8px 16px", fontSize: 11.5, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, boxShadow: "0 2px 8px rgba(13,148,136,0.2)" }}>
           Lihat Detail Keamanan →
         </button>
 

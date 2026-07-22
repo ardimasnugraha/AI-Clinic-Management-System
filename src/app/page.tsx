@@ -394,7 +394,7 @@ export default function MainPage() {
         {/* WORKSPACE */}
         <main style={{ flex:1, overflowY:"auto", padding:"24px 28px 40px" }}>
           <div style={{ maxWidth:1500, margin:"0 auto" }}>
-            {activeTab === "Dashboard"    && <DashboardView />}
+            {activeTab === "Dashboard"    && <DashboardView onNavigateTab={(tab) => setActiveTab(tab as any)} />}
             {activeTab === "Pasien"       && <PatientsView onMakeAppointment={handleMakeAppointmentForPatient} onStartEncounter={handleStartEncounter} />}
             {activeTab === "Appointment"  && <AppointmentsView initialPatient={prefilledPatientForAppt} onClearInitialPatient={() => setPrefilledPatientForAppt(null)} />}
             {activeTab === "Antrean"      && <QueueView />}

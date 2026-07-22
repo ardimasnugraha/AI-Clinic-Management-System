@@ -36,7 +36,7 @@ interface PatientsViewProps {
 }
 
 // No default patients defined (removed dummy data)
-];
+
 
 export default function PatientsView({ onMakeAppointment, onStartEncounter }: PatientsViewProps) {
   const [patients, setPatients] = useState<PatientItem[]>([]);
@@ -138,7 +138,7 @@ export default function PatientsView({ onMakeAppointment, onStartEncounter }: Pa
         setDuplicateCheck({ match: false, score: 0, matchPatient: null });
       }
     } else {
-      setDuplicateCheck({ match: true, score: 78, matchPatient: DEFAULT_PATIENTS[0] });
+      setDuplicateCheck({ match: true, score: 78, matchPatient: patients[0] });
     }
   }, [newPatient.name, newPatient.nik, patients]);
 
@@ -392,7 +392,7 @@ export default function PatientsView({ onMakeAppointment, onStartEncounter }: Pa
                   </tr>
                 ) : (
                   paginatedPatients.map((p, idx) => {
-                    const isSelected = selectedPatient.rm === p.rm;
+                    const isSelected = selectedPatient?.rm === p.rm;
                     const rmColor = getRmColor(idx);
 
                     return (
@@ -558,83 +558,89 @@ export default function PatientsView({ onMakeAppointment, onStartEncounter }: Pa
 
         {/* RIGHT: DETAIL PASIEN PANEL */}
         <div style={{ background: "#fff", borderRadius: 20, border: "1px solid #f1f5f9", padding: 20, boxShadow: "0 2px 10px rgba(0,0,0,0.02)", display: "flex", flexDirection: "column", gap: 16 }}>
-          
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <User style={{ width: 18, height: 18, color: "#0d9488" }} />
-              <h3 style={{ fontSize: 15, fontWeight: 800, color: "#0f172a", margin: 0 }}>Detail Pasien</h3>
+          {selectedPatient ? (
+            <>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <User style={{ width: 18, height: 18, color: "#0d9488" }} />
+                  <h3 style={{ fontSize: 15, fontWeight: 800, color: "#0f172a", margin: 0 }}>Detail Pasien</h3>
+                </div>
+                <span style={{ background: "#dcfce7", color: "#166534", padding: "2px 10px", borderRadius: 12, fontSize: 10.5, fontWeight: 800 }}>
+                  {selectedPatient.status}
+                </span>
+              </div>
+
+              {/* Profile Header Card */}
+              <div style={{ textAlign: "center", padding: "16px 10px", background: "#fafafa", borderRadius: 16, border: "1px solid #f1f5f9" }}>
+                <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#ccfbf1", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", border: "2px solid #0d9488" }}>
+                  <User style={{ width: 32, height: 32, color: "#0d9488" }} />
+                </div>
+                <h4 style={{ fontSize: 16, fontWeight: 900, color: "#0f172a", margin: 0 }}>{selectedPatient.name}</h4>
+                <span style={{ display: "inline-block", background: "#0d9488", color: "#fff", padding: "2px 10px", borderRadius: 10, fontSize: 11, fontWeight: 800, marginTop: 4 }}>
+                  {selectedPatient.rm}
+                </span>
+                <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, fontFamily: "monospace" }}>ID Pasien: {selectedPatient.nik}</div>
+              </div>
+
+              {/* Details List */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, fontSize: 11.5, color: "#475569" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <User style={{ width: 15, height: 15, color: "#64748b", flexShrink: 0, marginTop: 1 }} />
+                  <div><strong>Usia:</strong> {selectedPatient.age} tahun ({selectedPatient.dob})</div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <Phone style={{ width: 15, height: 15, color: "#64748b", flexShrink: 0, marginTop: 1 }} />
+                  <div><strong>No. HP:</strong> {selectedPatient.phone}</div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <Mail style={{ width: 15, height: 15, color: "#64748b", flexShrink: 0, marginTop: 1 }} />
+                  <div><strong>Email:</strong> {selectedPatient.email}</div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <MapPin style={{ width: 15, height: 15, color: "#64748b", flexShrink: 0, marginTop: 1 }} />
+                  <div><strong>Alamat:</strong> {selectedPatient.address}</div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <Activity style={{ width: 15, height: 15, color: "#ef4444", flexShrink: 0, marginTop: 1 }} />
+                  <div><strong>Alergi:</strong> {selectedPatient.allergies.join(", ")}</div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <ShieldCheck style={{ width: 15, height: 15, color: "#0ea5e9", flexShrink: 0, marginTop: 1 }} />
+                  <div><strong>Asuransi:</strong> {selectedPatient.insurance}<br /><span style={{ fontSize: 10, color: "#94a3b8" }}>No. {selectedPatient.insuranceNo}</span></div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <UserCheck style={{ width: 15, height: 15, color: "#8b5cf6", flexShrink: 0, marginTop: 1 }} />
+                  <div><strong>Kontak Darurat:</strong> {selectedPatient.emergencyContact.name} ({selectedPatient.emergencyContact.relation})<br /><span style={{ fontSize: 10, color: "#94a3b8" }}>{selectedPatient.emergencyContact.phone}</span></div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <ShieldCheck style={{ width: 15, height: 15, color: "#16a34a", flexShrink: 0, marginTop: 1 }} />
+                  <div><strong>Persetujuan & Privasi:</strong> {selectedPatient.privacyConsent} <span style={{ background: "#dcfce7", color: "#166534", padding: "1px 6px", borderRadius: 8, fontSize: 9.5, fontWeight: 800 }}>Terverifikasi</span></div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <FileText style={{ width: 15, height: 15, color: "#64748b", flexShrink: 0, marginTop: 1 }} />
+                  <div><strong>Preferensi Komunikasi:</strong> {selectedPatient.prefComm}</div>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => onStartEncounter?.({ rm: selectedPatient.rm, name: selectedPatient.name })}
+                style={{ width: "100%", marginTop: 8, padding: "11px 0", borderRadius: 12, border: "1px solid #bbf7d0", background: "#f0fdf4", color: "#166534", fontSize: 12.5, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                Lihat Riwayat Medis Pasien →
+              </button>
+            </>
+          ) : (
+            <div style={{ textAlign: "center", padding: "40px 20px", color: "#94a3b8" }}>
+              Pilih pasien untuk melihat detail
             </div>
-            <span style={{ background: "#dcfce7", color: "#166534", padding: "2px 10px", borderRadius: 12, fontSize: 10.5, fontWeight: 800 }}>
-              {selectedPatient.status}
-            </span>
-          </div>
-
-          {/* Profile Header Card */}
-          <div style={{ textAlign: "center", padding: "16px 10px", background: "#fafafa", borderRadius: 16, border: "1px solid #f1f5f9" }}>
-            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#ccfbf1", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", border: "2px solid #0d9488" }}>
-              <User style={{ width: 32, height: 32, color: "#0d9488" }} />
-            </div>
-            <h4 style={{ fontSize: 16, fontWeight: 900, color: "#0f172a", margin: 0 }}>{selectedPatient.name}</h4>
-            <span style={{ display: "inline-block", background: "#0d9488", color: "#fff", padding: "2px 10px", borderRadius: 10, fontSize: 11, fontWeight: 800, marginTop: 4 }}>
-              {selectedPatient.rm}
-            </span>
-            <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, fontFamily: "monospace" }}>ID Pasien: {selectedPatient.nik}</div>
-          </div>
-
-          {/* Details List */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, fontSize: 11.5, color: "#475569" }}>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-              <User style={{ width: 15, height: 15, color: "#64748b", flexShrink: 0, marginTop: 1 }} />
-              <div><strong>Usia:</strong> {selectedPatient.age} tahun ({selectedPatient.dob})</div>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-              <Phone style={{ width: 15, height: 15, color: "#64748b", flexShrink: 0, marginTop: 1 }} />
-              <div><strong>No. HP:</strong> {selectedPatient.phone}</div>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-              <Mail style={{ width: 15, height: 15, color: "#64748b", flexShrink: 0, marginTop: 1 }} />
-              <div><strong>Email:</strong> {selectedPatient.email}</div>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-              <MapPin style={{ width: 15, height: 15, color: "#64748b", flexShrink: 0, marginTop: 1 }} />
-              <div><strong>Alamat:</strong> {selectedPatient.address}</div>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-              <Activity style={{ width: 15, height: 15, color: "#ef4444", flexShrink: 0, marginTop: 1 }} />
-              <div><strong>Alergi:</strong> {selectedPatient.allergies.join(", ")}</div>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-              <ShieldCheck style={{ width: 15, height: 15, color: "#0ea5e9", flexShrink: 0, marginTop: 1 }} />
-              <div><strong>Asuransi:</strong> {selectedPatient.insurance}<br /><span style={{ fontSize: 10, color: "#94a3b8" }}>No. {selectedPatient.insuranceNo}</span></div>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-              <UserCheck style={{ width: 15, height: 15, color: "#8b5cf6", flexShrink: 0, marginTop: 1 }} />
-              <div><strong>Kontak Darurat:</strong> {selectedPatient.emergencyContact.name} ({selectedPatient.emergencyContact.relation})<br /><span style={{ fontSize: 10, color: "#94a3b8" }}>{selectedPatient.emergencyContact.phone}</span></div>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-              <ShieldCheck style={{ width: 15, height: 15, color: "#16a34a", flexShrink: 0, marginTop: 1 }} />
-              <div><strong>Persetujuan & Privasi:</strong> {selectedPatient.privacyConsent} <span style={{ background: "#dcfce7", color: "#166534", padding: "1px 6px", borderRadius: 8, fontSize: 9.5, fontWeight: 800 }}>Terverifikasi</span></div>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-              <FileText style={{ width: 15, height: 15, color: "#64748b", flexShrink: 0, marginTop: 1 }} />
-              <div><strong>Preferensi Komunikasi:</strong> {selectedPatient.prefComm}</div>
-            </div>
-          </div>
-
-          <button 
-            onClick={() => onStartEncounter?.({ rm: selectedPatient.rm, name: selectedPatient.name })}
-            style={{ width: "100%", marginTop: 8, padding: "11px 0", borderRadius: 12, border: "1px solid #bbf7d0", background: "#f0fdf4", color: "#166534", fontSize: 12.5, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-            Lihat Riwayat Medis Pasien →
-          </button>
-
+          )}
         </div>
 
       </div>
@@ -755,7 +761,7 @@ export default function PatientsView({ onMakeAppointment, onStartEncounter }: Pa
                     Tgl Lahir: {duplicateCheck.matchPatient?.dob || "15 Mei 1996"}<br />
                     No. HP: {duplicateCheck.matchPatient?.phone || "0812-3456-7890"}
                   </div>
-                  <button onClick={() => setSelectedPatient(duplicateCheck.matchPatient || DEFAULT_PATIENTS[0])} style={{ border: "none", background: "none", color: "#8b5cf6", fontSize: 11, fontWeight: 800, cursor: "pointer", padding: 0, marginTop: 6 }}>
+                  <button onClick={() => setSelectedPatient(duplicateCheck.matchPatient || patients[0])} style={{ border: "none", background: "none", color: "#8b5cf6", fontSize: 11, fontWeight: 800, cursor: "pointer", padding: 0, marginTop: 6 }}>
                     Lihat Detail →
                   </button>
                 </div>

@@ -31,40 +31,57 @@ async function runSetup() {
 
   console.log("Provisioning Google Demo Accounts...");
 
-  // 1. Buat Akun Demo dr. Maya Lestari
-  const { data: user1, error: err1 } = await supabase.auth.admin.createUser({
-    email: "dokter@sehatsentosa.com",
-    password: "Password123!",
-    email_confirm: true,
-    user_metadata: {
-      full_name: "dr. Maya Lestari",
-      clinic_name: "Klinik Sehat Sentosa",
-      role: "Dokter",
-      poli: "Umum"
-    }
-  });
-  if (err1) {
-    console.log("Status Akun Demo 1:", err1.message);
-  } else {
-    console.log("✅ Akun Demo 1 Terbuat & Terkonfirmasi:", user1.user.email);
-  }
+  await provisionDemoUser("dokter@sehatsentosa.com", "admindokter123", "dr. Maya Lestari", "Dokter", "Umum");
+  await provisionDemoUser("sari.dewi@sehatsentosa.com", "admindokter123", "drg. Sari Dewi", "Dokter", "Gigi");
+}
 
-  // 2. Buat Akun Demo drg. Sari Dewi
-  const { data: user2, error: err2 } = await supabase.auth.admin.createUser({
-    email: "sari.dewi@sehatsentosa.com",
-    password: "Password123!",
-    email_confirm: true,
-    user_metadata: {
-      full_name: "drg. Sari Dewi",
-      clinic_name: "Klinik Sehat Sentosa",
-      role: "Dokter",
-      poli: "Gigi"
+async function provisionDemoUser(email, password, fullName, role, poli) {
+  const { data, error: listErr } = await supabase.auth.admin.listUsers();
+  if (listErr) {
+    console.error("Gagal mengambil daftar user:", listErr.message);
+    return;
+  }
+  
+  const users = data?.users || [];
+  const existing = users.find(u => u.email === email);
+  if (existing) {
+    console.log(`Akun ${email} sudah ada. Melakukan pembaruan & konfirmasi email...`);
+    const { error: updErr } = await supabase.auth.admin.updateUserById(
+      existing.id,
+      { 
+        email_confirm: true, 
+        password: password,
+        user_metadata: {
+          full_name: fullName,
+          clinic_name: "Klinik Sehat Sentosa",
+          role: role,
+          poli: poli
+        }
+      }
+    );
+    if (updErr) {
+      console.error(`❌ Gagal memperbarui ${email}:`, updErr.message);
+    } else {
+      console.log(`✅ Akun ${email} berhasil diperbarui & terkonfirmasi.`);
     }
-  });
-  if (err2) {
-    console.log("Status Akun Demo 2:", err2.message);
   } else {
-    console.log("✅ Akun Demo 2 Terbuat & Terkonfirmasi:", user2.user.email);
+    console.log(`Akun ${email} belum ada. Membuat baru...`);
+    const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
+      email: email,
+      password: password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: fullName,
+        clinic_name: "Klinik Sehat Sentosa",
+        role: role,
+        poli: poli
+      }
+    });
+    if (createErr) {
+      console.error(`❌ Gagal membuat ${email}:`, createErr.message);
+    } else {
+      console.log(`✅ Akun ${email} berhasil dibuat & terkonfirmasi.`);
+    }
   }
 }
 

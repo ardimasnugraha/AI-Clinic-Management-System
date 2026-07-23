@@ -60,7 +60,7 @@ export default function LoginPage() {
     try {
       const { error: signInErr } = await supabase.auth.signInWithPassword({
         email: demoEmail,
-        password: "Password123!"
+        password: "admindokter123"
       });
       if (signInErr) {
         setError("Akun demo belum terbuat atau belum terverifikasi di database. Silakan jalankan 'node scripts/setup-db.js' pada terminal proyek Anda untuk membuat akun demo secara instan dan aman.");

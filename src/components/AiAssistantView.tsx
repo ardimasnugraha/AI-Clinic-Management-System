@@ -285,8 +285,15 @@ export default function AiAssistantView() {
             if (res.ok) {
               data = await res.json();
               break;
+            } else {
+              const errData = await res.json().catch(() => ({}));
+              throw new Error(`Gagal menghubungi server AI: ${errData?.error?.message || res.statusText}. Pastikan API Key Google AI Studio Anda valid!`);
             }
-          } catch (e: any) {}
+          } catch (e: any) {
+            if (e.message.includes("Gagal menghubungi") || e.message.includes("API Key")) {
+              throw e; // Lemparkan error spesifik ini ke catch terluar
+            }
+          }
         }
 
         if (data && data.candidates?.[0]?.content?.parts?.[0]?.text) {
@@ -295,7 +302,7 @@ export default function AiAssistantView() {
           responseText = getAiResponse(text);
         }
       } else {
-        responseText = getAiResponse(text);
+        responseText = "Mohon masukkan API Key Google AI Studio Anda di kolom pengaturan di atas agar AI dapat menganalisis dan meracik obat secara dinamis untuk Anda.";
       }
 
       const aiMsg: Message = {
@@ -305,7 +312,8 @@ export default function AiAssistantView() {
       };
       setMessages((prev) => [...prev, aiMsg]);
     } catch (err: any) {
-      const fallbackResponse = getAiResponse(text);
+      const fallbackResponse = `⚠️ **Peringatan Sistem**: ${err.message || 'Terjadi kesalahan'}\n\nSilakan periksa kembali API Key Anda (di bagian 'Koneksi Asisten AI Medis' di atas). Jika menggunakan API Key bawaan (.env.local), kemungkinan besar key tersebut dummy/tidak valid. Masukkan kunci asli Anda yang diawali dengan 'AIZaSy...'.`;
+      
       const aiMsg: Message = {
         sender: "ai",
         text: fallbackResponse,

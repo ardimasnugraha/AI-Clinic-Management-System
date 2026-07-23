@@ -57,6 +57,7 @@ const CLINICAL_RECOMMENDATIONS = [
 ];
 
 export default function AiAssistantView() {
+  const [healthMode, setHealthMode] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       sender: "ai",
@@ -253,7 +254,19 @@ export default function AiAssistantView() {
       let responseText = "";
       const cleanKey = apiKey.trim();
 
-      if (cleanKey) {
+      if (healthMode) {
+        const res = await fetch('/api/health-query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: text })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          responseText = data.answer || data.error || 'Tidak ada respons.';
+        } else {
+          responseText = `Error health query: ${res.status}`;
+        }
+      } else if (cleanKey) {
         const modelsToTry = [
           "gemini-2.5-flash",
           "gemini-2.0-flash",
@@ -539,11 +552,28 @@ export default function AiAssistantView() {
             onSubmit={(e) => { e.preventDefault(); handleSendMessage(inputText); }}
             style={{ padding: "16px 20px", borderTop: "1px solid #f1f5f9", display: "flex", gap: 10, background: "#fff" }}
           >
+            {/* Health Mode Toggle */}
+            <button
+              type="button"
+              onClick={() => setHealthMode(!healthMode)}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: "1px solid #cbd5e1",
+                background: healthMode ? "#0d9488" : "#fff",
+                color: healthMode ? "#fff" : "#475569",
+                fontSize: 11,
+                cursor: "pointer",
+              }}
+              title="Toggle Health Mode (uses web search)"
+            >
+              {healthMode ? "Mode Kesehatan: ON" : "Mode Kesehatan: OFF"}
+            </button>
             <input
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Tanyakan apa saja (Ibu Kota Indonesia, Sejarah, Sains, Medis, dll)..."
+              placeholder={healthMode ? "Tanya kesehatan (contoh: gejala diabetes)" : "Tanyakan apa saja (Ibu Kota Indonesia, Sejarah, Sains, Medis, dll)..."}
               style={{
                 flex: 1,
                 padding: "12px 16px",

@@ -21,9 +21,10 @@ Jangan pernah memberikan dosis spesifik obat resep — arahkan ke dokter untuk h
 /**
  * Panggil Gemini API sebagai fallback / sumber utama jawaban kesehatan.
  */
-async function askGemini(question: string, context?: string): Promise<string> {
-  if (!GEMINI_API_KEY) {
-    throw new Error('Gemini API key tidak ditemukan. Harap isi NEXT_PUBLIC_GEMINI_API_KEY di .env.local');
+async function askGemini(question: string, context?: string, clientApiKey?: string): Promise<string> {
+  const apiKeyToUse = clientApiKey || GEMINI_API_KEY;
+  if (!apiKeyToUse) {
+    throw new Error('Gemini API key tidak ditemukan. Harap isi NEXT_PUBLIC_GEMINI_API_KEY di .env.local atau masukkan di antarmuka.');
   }
 
   const userContent = context
@@ -36,7 +37,7 @@ async function askGemini(question: string, context?: string): Promise<string> {
   for (const model of models) {
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKeyToUse}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -106,6 +107,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
     const question: string = body?.question || '';
+    const clientApiKey: string = body?.apiKey || '';
 
     if (!question.trim()) {
       return NextResponse.json(
@@ -124,7 +126,7 @@ export async function POST(req: Request) {
     const searchSnippets = await tryGoogleSearch(`kesehatan ${question}`);
 
     // 3. Tanya Gemini — dengan atau tanpa konteks dari Google Search
-    const geminiAnswer = await askGemini(question, searchSnippets || undefined);
+    const geminiAnswer = await askGemini(question, searchSnippets || undefined, clientApiKey);
 
     // 4. Tambahkan label sumber jika pakai Google Search
     const sourceLabel = searchSnippets

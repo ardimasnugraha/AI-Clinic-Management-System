@@ -258,7 +258,7 @@ export default function AiAssistantView() {
         const res = await fetch('/api/health-query', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question: text })
+          body: JSON.stringify({ question: text, apiKey: cleanKey })
         });
         if (res.ok) {
           const data = await res.json();

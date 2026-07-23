@@ -8,7 +8,7 @@ const supabaseAnonKey =
   "";
 
 // Routes that do NOT require authentication
-const PUBLIC_ROUTES = ["/login", "/register", "/forgot-password"];
+const PUBLIC_ROUTES = ["/login", "/register", "/forgot-password", "/api"];
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });

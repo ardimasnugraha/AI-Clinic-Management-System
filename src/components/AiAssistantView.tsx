@@ -96,15 +96,38 @@ export default function AiAssistantView() {
       return "Ibu Kota Negara Indonesia adalah **Nusantara (IKN)** di Kalimantan Timur. Jika Anda menanyakan ibu kota negara lain, silakan sebutkan nama negaranya!";
     }
 
-    // 2. SEJARAH & TOKOH INDONESIA
-    if (text.includes("presiden")) {
-      if (text.includes("pertama") || text.includes("1")) {
-        return "Presiden pertama Republik Indonesia adalah **Ir. Soekarno** (Bung Karno), dengan Wakil Presiden Mohammad Hatta (Bung Hatta), yang memproklamasikan kemerkaan pada 17 Agustus 1945.";
+    // 2. SEJARAH, PEMIMPIN & TOKOH DUNIA
+    if (text.includes("presiden") || text.includes("perdana menteri") || text.includes("pm")) {
+      // Amerika Serikat
+      if (text.includes("amerika") || text.includes("as") || text.includes("us") || text.includes("usa")) {
+        return "Presiden Amerika Serikat saat ini adalah **Joe Biden** (Presiden ke-46) dan Presiden terpilih adalah **Donald Trump** (Presiden ke-47).";
       }
-      if (text.includes("sekarang") || text.includes("saat ini") || text.includes("2024") || text.includes("2025") || text.includes("2026")) {
-        return "Presiden Republik Indonesia saat ini adalah **Bapak Prabowo Subianto** bersama Wakil Presiden **Bapak Gibran Rakabuming Raka**.";
+      // Indonesia
+      if (text.includes("indonesia") || text.includes("ri")) {
+        if (text.includes("pertama") || text.includes("1")) {
+          return "Presiden pertama Republik Indonesia adalah **Ir. Soekarno** (Bung Karno), dengan Wakil Presiden Mohammad Hatta (Bung Hatta), yang memproklamasikan kemerdekaan pada 17 Agustus 1945.";
+        }
+        return "Presiden Republik Indonesia saat ini adalah **Bapak Prabowo Subianto** (Presiden ke-8) bersama Wakil Presiden **Bapak Gibran Rakabuming Raka**.";
       }
-      return "Presiden Republik Indonesia pertama adalah Ir. Soekarno, dan Presiden saat ini adalah Bapak Prabowo Subianto.";
+      // Rusia
+      if (text.includes("rusia") || text.includes("russia")) {
+        return "Presiden Rusia saat ini adalah **Vladimir Putin**.";
+      }
+      // Cina / Tiongkok
+      if (text.includes("cina") || text.includes("china") || text.includes("tiongkok")) {
+        return "Presiden Republik Rakyat Tiongkok saat ini adalah **Xi Jinping**.";
+      }
+      // Prancis
+      if (text.includes("prancis") || text.includes("france")) {
+        return "Presiden Prancis saat ini adalah **Emmanuel Macron**.";
+      }
+      // Perdana Menteri
+      if (text.includes("inggris") || text.includes("uk")) return "Perdana Menteri Inggris (UK) saat ini adalah **Keir Starmer**.";
+      if (text.includes("jepang")) return "Perdana Menteri Jepang saat ini adalah **Shigeru Ishiba**.";
+      if (text.includes("malaysia")) return "Perdana Menteri Malaysia saat ini adalah **Anwar Ibrahim**.";
+      if (text.includes("singapura")) return "Perdana Menteri Singapura saat ini adalah **Lawrence Wong**.";
+
+      return "Presiden Republik Indonesia saat ini adalah **Bapak Prabowo Subianto**, sedangkan Presiden Amerika Serikat adalah **Joe Biden / Donald Trump**. Silakan sebutkan nama negara spesifik yang ingin Anda ketahui!";
     }
 
     if (text.includes("kemerdekaan") || text.includes("17 agustus")) {
@@ -230,7 +253,7 @@ export default function AiAssistantView() {
       let responseText = "";
       const cleanKey = apiKey.trim();
 
-      if (cleanKey && cleanKey.startsWith("AIZaSy")) {
+      if (cleanKey) {
         const modelsToTry = [
           "gemini-2.5-flash",
           "gemini-2.0-flash",

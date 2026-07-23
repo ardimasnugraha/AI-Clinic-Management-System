@@ -26,6 +26,19 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
   const [showAllDoctorsModal, setShowAllDoctorsModal] = useState<boolean>(false);
   const [activeAiModal, setActiveAiModal] = useState<{ title: string; desc: string; detail: string } | null>(null);
 
+  // Admin & Form States for Doctor Schedule
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
+  const [showAddForm, setShowAddForm] = useState<boolean>(false);
+  const [newDocForm, setNewDocForm] = useState({
+    name: "",
+    poli: "Umum",
+    sip: "",
+    phone: "",
+    color: "#0d9488",
+    status: "Aktif",
+    time: "08:00 - 16:00"
+  });
+
   // Real-time Supabase & Store Data States
   const [patientCount, setPatientCount] = useState<number>(0);
   const [todayApptCount, setTodayApptCount] = useState<number>(0);
@@ -38,172 +51,305 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
 
   const [liveQueue, setLiveQueue] = useState<Array<{ no: string; name: string; service: string; time: string; status: string }>>([]);
 
-  const [doctorsList, setDoctorsList] = useState<Array<{ name: string; poli: string; time: string; count: number; initials: string; bg: string; color: string; sip?: string; phone?: string }>>([]);
+  const [doctorsList, setDoctorsList] = useState<Array<{
+    id: string;
+    name: string;
+    poli: string;
+    time: string;
+    count: number;
+    initials: string;
+    bg: string;
+    color: string;
+    sip?: string;
+    phone?: string;
+    status: string;
+  }>>([]);
 
   const [encounterStats, setEncounterStats] = useState({ total: 0, selesai: 0, dirujuk: 0, followUp: 0 });
   const [auditTime, setAuditTime] = useState("10:24");
 
-  // Fetch Supabase Data dynamically
-  useEffect(() => {
-    async function loadSupabaseData() {
-      try {
-        // 1. Fetch Pasien dari Supabase
-        const { count: countP, data: pData } = await supabase.from("patients").select("*", { count: "exact" });
-        if (countP !== null) {
-          setPatientCount(countP);
-        } else {
-          const localP = localStorage.getItem("clinic_patients_v1");
-          if (localP) setPatientCount(JSON.parse(localP).length);
-        }
-
-        // 2. Fetch Appointments dari Supabase
-        const { count: countA, data: apptsData } = await supabase.from("appointments").select("*", { count: "exact" });
-        if (countA !== null) {
-          setTodayApptCount(countA);
-          if (apptsData) {
-            setAllApptsData(apptsData);
-            const mappedAppts = apptsData.slice(0, 5).map((a: any) => ({
-              time: a.duration ? a.duration.split(" - ")[0] : "08:30",
-              name: a.doctor_name || "Pasien",
-              type: a.poli || "Konsultasi Umum",
-              status: a.status === "menunggu" ? "Menunggu" : a.status === "selesai" ? "Selesai" : "Terjadwal"
-            }));
-            setAppointmentsList(mappedAppts);
-          }
-        } else {
-          const localA = localStorage.getItem("clinic_appointments_v1");
-          if (localA) {
-            const parsedA = JSON.parse(localA);
-            setTodayApptCount(parsedA.length);
-            setAppointmentsList(parsedA.slice(0, 5).map((a: any) => ({
-              time: a.time || "08:30",
-              name: a.patientName || a.name || "Pasien",
-              type: a.poli || "Konsultasi",
-              status: a.status || "Terjadwal"
-            })));
-          }
-        }
-
-        // 3. Fetch Queues & Pendapatan
-        const { data: qData } = await supabase.from("queues").select("*").in("status", ["menunggu", "dipanggil"]);
-        if (qData) {
-          const activeCount = qData.filter((q: any) => q.status === "menunggu" || q.status === "dipanggil").length;
-          setActiveQueueCount(activeCount);
-          
-          const serving = qData.filter((q: any) => q.status === "dipanggil").map((q: any) => ({
-            ticket_no: q.ticket_no,
-            poli: q.poli
-          }));
-          setServingQueues(serving);
-
-          setLiveQueue(qData.map((q: any) => ({
-            no: q.ticket_no,
-            name: q.patient_name,
-            service: q.poli,
-            time: q.created_time || "09:00",
-            status: q.status === "dipanggil" ? "Dipanggil" : q.status === "menunggu" ? "Menunggu" : q.status
-          })));
-        } else {
-          // Fallback ke LocalStorage jika tabel Supabase tidak ada/error
-          const cached = localStorage.getItem("clinic_queue_v1");
-          if (cached) {
-            try {
-              const parsed = JSON.parse(cached);
-              const activeItems = parsed.filter((q: any) => q.status === "menunggu" || q.status === "dipanggil");
-              setActiveQueueCount(activeItems.length);
-              
-              const serving = activeItems.filter((q: any) => q.status === "dipanggil").map((q: any) => ({
-                ticket_no: q.no,
-                poli: q.poli
-              }));
-              setServingQueues(serving);
-
-              setLiveQueue(activeItems.map((q: any) => ({
-                no: q.no,
-                name: q.name,
-                service: q.poli,
-                time: q.createdTime || "09:00",
-                status: q.status === "dipanggil" ? "Dipanggil" : q.status === "menunggu" ? "Menunggu" : q.status
-              })));
-            } catch (e) {
-              console.warn("Gagal parse localStorage queue", e);
-            }
-          }
-        }
-
-        const { data: invData } = await supabase.from("invoices").select("total").eq("status", "Lunas");
-        if (invData) {
-          const rev = invData.reduce((acc: number, curr: any) => acc + Number(curr.total || 0), 0);
-          setTodayRevenue(rev);
-        }
-
-        // 4. Fetch Doctors & Hitung Slot Pasien Terdaftar dari Supabase
-        const { data: docProfiles } = await supabase.from("doctor_profiles").select("*");
-        const allDocs = (docProfiles && docProfiles.length > 0) 
-          ? docProfiles.map((d: any) => ({ name: d.full_name, poli: d.poli, color: d.color, sip: d.sip, phone: d.phone }))
-          : getStoredDoctors();
-
-        if (allDocs && allDocs.length > 0) {
-          const mappedDocs = allDocs.map((d: any) => {
-            const docName = d.name || d.full_name;
-            const docSub = docName.split(" ")[1] || docName;
-            const cleanPoli = (d.poli || "").replace("Dokter ", "").replace("Poli ", "").toLowerCase();
-
-            const aptCount = (apptsData || []).filter((a: any) => {
-              const matchDoc = (a.doctor_name || "").toLowerCase().includes(docSub.toLowerCase());
-              const matchPoli = (a.poli || "").toLowerCase().includes(cleanPoli);
-              return matchDoc || matchPoli;
-            }).length;
-
-            const qCount = (qData || []).filter((q: any) => {
-              const matchDoc = (q.doctor_name || "").toLowerCase().includes(docSub.toLowerCase());
-              const matchPoli = (q.poli || "").toLowerCase().includes(cleanPoli);
-              return matchDoc || matchPoli;
-            }).length;
-
-            return {
-              name: docName,
-              poli: d.poli.startsWith("Dokter") ? d.poli : `Dokter ${d.poli}`,
-              time: "08:00 - 16:00",
-              count: aptCount + qCount,
-              initials: docName.split(" ").map((w: string) => w[0]).slice(0, 2).join(""),
-              bg: d.color ? `${d.color}22` : "#e0f2fe",
-              color: d.color || "#0d9488",
-              sip: d.sip || "SIP-2026-001",
-              phone: d.phone || "0812-0000-0000"
-            };
-          });
-          setDoctorsList(mappedDocs);
-        } else {
-          setDoctorsList([]);
-        }
-
-        // 5. Fetch Encounters dari Supabase
-        const { count: countE, data: eData } = await supabase.from("encounters").select("*", { count: "exact" });
-        if (countE !== null) {
-          const finished = eData ? eData.filter((e: any) => e.status === "completed" || e.status === "selesai").length : 0;
-          setEncounterStats({
-            total: countE,
-            selesai: finished,
-            dirujuk: 0,
-            followUp: Math.max(0, countE - finished)
-          });
-        }
-
-        // 6. Fetch Audit Log Waktu Terakhir dari Supabase
-        const { data: logData } = await supabase.from("audit_logs").select("created_at").order("created_at", { ascending: false }).limit(1);
-        if (logData && logData.length > 0) {
-          const t = new Date(logData[0].created_at);
-          setAuditTime(`${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`);
-        }
-
-      } catch (err) {
-        console.warn("Error fetching Supabase dashboard data:", err);
+  const loadDashboardData = async () => {
+    try {
+      // 1. Fetch Pasien dari Supabase
+      const { count: countP, data: pData } = await supabase.from("patients").select("*", { count: "exact" });
+      if (countP !== null) {
+        setPatientCount(countP);
+      } else {
+        const localP = localStorage.getItem("clinic_patients_v1");
+        if (localP) setPatientCount(JSON.parse(localP).length);
       }
+
+      // 2. Fetch Appointments dari Supabase
+      const { count: countA, data: apptsData } = await supabase.from("appointments").select("*", { count: "exact" });
+      let allAppts: any[] = [];
+      if (countA !== null) {
+        setTodayApptCount(countA);
+        if (apptsData) {
+          setAllApptsData(apptsData);
+          allAppts = apptsData;
+          const mappedAppts = apptsData.slice(0, 5).map((a: any) => ({
+            time: a.duration ? a.duration.split(" - ")[0] : "08:30",
+            name: a.doctor_name || "Pasien",
+            type: a.poli || "Konsultasi Umum",
+            status: a.status === "menunggu" ? "Menunggu" : a.status === "selesai" ? "Selesai" : "Terjadwal"
+          }));
+          setAppointmentsList(mappedAppts);
+        }
+      } else {
+        const localA = localStorage.getItem("clinic_appointments_v1");
+        if (localA) {
+          const parsedA = JSON.parse(localA);
+          setTodayApptCount(parsedA.length);
+          allAppts = parsedA;
+          setAppointmentsList(parsedA.slice(0, 5).map((a: any) => ({
+            time: a.time || "08:30",
+            name: a.patientName || a.name || "Pasien",
+            type: a.poli || "Konsultasi",
+            status: a.status || "Terjadwal"
+          })));
+        }
+      }
+
+      // 3. Fetch Queues & Pendapatan
+      const { data: qData } = await supabase.from("queues").select("*").in("status", ["menunggu", "dipanggil"]);
+      let activeQueues: any[] = [];
+      if (qData) {
+        activeQueues = qData;
+        const activeCount = qData.filter((q: any) => q.status === "menunggu" || q.status === "dipanggil").length;
+        setActiveQueueCount(activeCount);
+        
+        const serving = qData.filter((q: any) => q.status === "dipanggil").map((q: any) => ({
+          ticket_no: q.ticket_no,
+          poli: q.poli
+        }));
+        setServingQueues(serving);
+
+        setLiveQueue(qData.map((q: any) => ({
+          no: q.ticket_no,
+          name: q.patient_name,
+          service: q.poli,
+          time: q.created_time || "09:00",
+          status: q.status === "dipanggil" ? "Dipanggil" : q.status === "menunggu" ? "Menunggu" : q.status
+        })));
+      } else {
+        // Fallback ke LocalStorage jika tabel Supabase tidak ada/error
+        const cached = localStorage.getItem("clinic_queue_v1");
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            const activeItems = parsed.filter((q: any) => q.status === "menunggu" || q.status === "dipanggil");
+            activeQueues = activeItems;
+            setActiveQueueCount(activeItems.length);
+            
+            const serving = activeItems.filter((q: any) => q.status === "dipanggil").map((q: any) => ({
+              ticket_no: q.no,
+              poli: q.poli
+            }));
+            setServingQueues(serving);
+
+            setLiveQueue(activeItems.map((q: any) => ({
+              no: q.no,
+              name: q.name,
+              service: q.poli,
+              time: q.createdTime || "09:00",
+              status: q.status === "dipanggil" ? "Dipanggil" : q.status === "menunggu" ? "Menunggu" : q.status
+            })));
+          } catch (e) {
+            console.warn("Gagal parse localStorage queue", e);
+          }
+        }
+      }
+
+      const { data: invData } = await supabase.from("invoices").select("total").eq("status", "Lunas");
+      if (invData) {
+        const rev = invData.reduce((acc: number, curr: any) => acc + Number(curr.total || 0), 0);
+        setTodayRevenue(rev);
+      }
+
+      // 4. Fetch Doctors & Hitung Slot Pasien Terdaftar dari Supabase
+      const { data: docProfiles } = await supabase.from("doctor_profiles").select("*");
+      const allDocs = (docProfiles && docProfiles.length > 0) 
+        ? docProfiles.map((d: any) => ({ 
+            id: d.doctor_id || d.id, 
+            name: d.full_name, 
+            poli: d.poli, 
+            color: d.color, 
+            sip: d.sip, 
+            phone: d.phone,
+            status: d.status,
+            time: d.time || "08:00 - 16:00"
+          }))
+        : getStoredDoctors();
+
+      if (allDocs && allDocs.length > 0) {
+        const mappedDocs = allDocs.map((d: any) => {
+          const docName = d.name || d.full_name;
+          const docSub = docName.split(" ")[1] || docName;
+          const cleanPoli = (d.poli || "").replace("Dokter ", "").replace("Poli ", "").toLowerCase();
+
+          const aptCount = (allAppts || []).filter((a: any) => {
+            const matchDoc = (a.doctor_name || "").toLowerCase().includes(docSub.toLowerCase());
+            const matchPoli = (a.poli || "").toLowerCase().includes(cleanPoli);
+            return matchDoc || matchPoli;
+          }).length;
+
+          const qCount = (activeQueues || []).filter((q: any) => {
+            const matchDoc = (q.doctor_name || "").toLowerCase().includes(docSub.toLowerCase());
+            const matchPoli = (q.poli || "").toLowerCase().includes(cleanPoli);
+            return matchDoc || matchPoli;
+          }).length;
+
+          return {
+            id: d.id || `DOC-${docName}`,
+            name: docName,
+            poli: d.poli.startsWith("Dokter") ? d.poli : `Dokter ${d.poli}`,
+            time: d.time || "08:00 - 16:00",
+            count: aptCount + qCount,
+            initials: docName.split(" ").map((w: string) => w[0]).slice(0, 2).join(""),
+            bg: d.color ? `${d.color}22` : "#e0f2fe",
+            color: d.color || "#0d9488",
+            sip: d.sip || "SIP-2026-001",
+            phone: d.phone || "0812-0000-0000",
+            status: d.status || "Aktif"
+          };
+        });
+        setDoctorsList(mappedDocs);
+      } else {
+        setDoctorsList([]);
+      }
+
+      // 5. Fetch Encounters dari Supabase
+      const { count: countE, data: eData } = await supabase.from("encounters").select("*", { count: "exact" });
+      if (countE !== null) {
+        const finished = eData ? eData.filter((e: any) => e.status === "completed" || e.status === "selesai").length : 0;
+        setEncounterStats({
+          total: countE,
+          selesai: finished,
+          dirujuk: 0,
+          followUp: Math.max(0, countE - finished)
+        });
+      }
+
+      // 6. Fetch Audit Log Waktu Terakhir dari Supabase
+      const { data: logData } = await supabase.from("audit_logs").select("created_at").order("created_at", { ascending: false }).limit(1);
+      if (logData && logData.length > 0) {
+        const t = new Date(logData[0].created_at);
+        setAuditTime(`${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`);
+      }
+
+    } catch (err) {
+      console.warn("Error fetching Supabase dashboard data:", err);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [timeFilter]);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setCurrentUserEmail(user.email || "");
+      }
+    });
+  }, []);
+
+  const handleAddDoctor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDocForm.name || !newDocForm.poli) {
+      alert("Nama dan Poli wajib diisi!");
+      return;
     }
 
-    loadSupabaseData();
-  }, [timeFilter]);
+    const nextDocId = `DOC${String(doctorsList.length + 1).padStart(3, "0")}`;
+    const newDocObj = {
+      id: nextDocId,
+      name: newDocForm.name,
+      poli: newDocForm.poli,
+      sip: newDocForm.sip || "SIP-2026-001",
+      phone: newDocForm.phone || "0812-0000-0000",
+      color: newDocForm.color || "#0d9488",
+      status: newDocForm.status,
+      time: newDocForm.time || "08:00 - 16:00"
+    };
+
+    // Save to Supabase
+    try {
+      await supabase.from("doctor_profiles").insert([{
+        clinic_id: "11111111-1111-1111-1111-111111111111",
+        doctor_id: nextDocId,
+        full_name: newDocObj.name,
+        poli: newDocObj.poli,
+        sip: newDocObj.sip,
+        phone: newDocObj.phone,
+        color: newDocObj.color,
+        status: newDocObj.status,
+        time: newDocObj.time
+      }]);
+    } catch (e) {
+      console.warn("Failed saving new doctor to Supabase", e);
+    }
+
+    // Save to localStorage
+    const currentCached = localStorage.getItem("clinic_doctors_v1");
+    let docs = [];
+    if (currentCached) {
+      try {
+        docs = JSON.parse(currentCached);
+      } catch (err) {}
+    }
+    const updatedDocs = [...docs, newDocObj];
+    localStorage.setItem("clinic_doctors_v1", JSON.stringify(updatedDocs));
+
+    // Reload Dashboard data
+    await loadDashboardData();
+
+    // Reset Form & show success
+    setNewDocForm({ name: "", poli: "Umum", sip: "", phone: "", color: "#0d9488", status: "Aktif", time: "08:00 - 16:00" });
+    setShowAddForm(false);
+  };
+
+  const handleUpdateDoctorStatus = async (docId: string, newStatus: string) => {
+    // Update local storage
+    const currentCached = localStorage.getItem("clinic_doctors_v1");
+    if (currentCached) {
+      try {
+        const docs = JSON.parse(currentCached);
+        const updated = docs.map((d: any) => d.id === docId || d.doctor_id === docId ? { ...d, status: newStatus } : d);
+        localStorage.setItem("clinic_doctors_v1", JSON.stringify(updated));
+      } catch (e) {}
+    }
+
+    // Update Supabase
+    try {
+      await supabase.from("doctor_profiles").update({ status: newStatus }).or(`doctor_id.eq.${docId},id.eq.${docId}`);
+    } catch (e) {}
+
+    // Reload
+    await loadDashboardData();
+  };
+
+  const handleDeleteDoctor = async (docId: string) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus dokter ini dari jadwal?")) return;
+
+    // Delete local storage
+    const currentCached = localStorage.getItem("clinic_doctors_v1");
+    if (currentCached) {
+      try {
+        const docs = JSON.parse(currentCached);
+        const updated = docs.filter((d: any) => d.id !== docId && d.doctor_id !== docId);
+        localStorage.setItem("clinic_doctors_v1", JSON.stringify(updated));
+      } catch (e) {}
+    }
+
+    // Delete Supabase
+    try {
+      await supabase.from("doctor_profiles").delete().or(`doctor_id.eq.${docId},id.eq.${docId}`);
+    } catch (e) {}
+
+    // Reload
+    await loadDashboardData();
+  };
 
   // Handler when clicking a day on calendar
   const handleSelectDay = (day: number) => {
@@ -241,25 +387,185 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
             </div>
 
             {showAllDoctorsModal ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12, maxHeight: 400, overflowY: "auto" }}>
-                {doctorsList.map((doc, idx) => (
-                  <div key={idx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f8fafc", padding: 14, borderRadius: 14, border: "1px solid #e2e8f0" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div style={{ width: 42, height: 42, borderRadius: "50%", background: doc.bg, color: doc.color, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 14 }}>
-                        {doc.initials}
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>{doc.name}</div>
-                        <div style={{ fontSize: 11, color: doc.color, fontWeight: 700 }}>{doc.poli}</div>
-                        <div style={{ fontSize: 10.5, color: "#64748b" }}>{doc.sip || "SIP-2026-001"} • {doc.phone || "0812-1111-2222"}</div>
-                      </div>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <span style={{ background: "#dcfce7", color: "#166534", padding: "3px 10px", borderRadius: 12, fontSize: 10.5, fontWeight: 800 }}>Aktif</span>
-                      <div style={{ fontSize: 11, color: "#0f172a", fontWeight: 700, marginTop: 4 }}>{doc.time}</div>
-                    </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {/* Admin Add Doctor Row */}
+                {currentUserEmail.toLowerCase() === "admin@klinikai.co.id" && (
+                  <div style={{ marginBottom: 12, borderBottom: "1px solid #f1f5f9", paddingBottom: 12 }}>
+                    {!showAddForm ? (
+                      <button 
+                        onClick={() => setShowAddForm(true)}
+                        style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 12, padding: "8px 16px", fontSize: 12, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, boxShadow: "0 2px 8px rgba(13,148,136,0.15)" }}>
+                        ➕ Tambah Dokter ke Jadwal
+                      </button>
+                    ) : (
+                      <form onSubmit={handleAddDoctor} style={{ background: "#f8fafc", padding: 16, borderRadius: 16, border: "1px solid #e2e8f0", display: "flex", flexDirection: "column", gap: 10 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 900, color: "#0f172a" }}>Tambah Dokter Baru</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                          <div>
+                            <label style={{ fontSize: 10.5, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 4 }}>Nama Dokter</label>
+                            <input 
+                              type="text" 
+                              required
+                              value={newDocForm.name}
+                              onChange={e => setNewDocForm({ ...newDocForm, name: e.target.value })}
+                              placeholder="Contoh: dr. Andi Wijaya"
+                              style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 12, outline: "none" }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 10.5, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 4 }}>Spesialisasi / Poli</label>
+                            <select 
+                              value={newDocForm.poli}
+                              onChange={e => setNewDocForm({ ...newDocForm, poli: e.target.value })}
+                              style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 12, outline: "none", background: "#fff" }}
+                            >
+                              <option value="Umum">Umum</option>
+                              <option value="Gigi">Gigi</option>
+                              <option value="Jantung">Jantung</option>
+                              <option value="Mata">Mata</option>
+                              <option value="Kulit">Kulit</option>
+                              <option value="Anak">Anak</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                          <div>
+                            <label style={{ fontSize: 10.5, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 4 }}>No. SIP</label>
+                            <input 
+                              type="text" 
+                              value={newDocForm.sip}
+                              onChange={e => setNewDocForm({ ...newDocForm, sip: e.target.value })}
+                              placeholder="Contoh: SIP-2026-009"
+                              style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 12, outline: "none" }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 10.5, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 4 }}>No. Telepon / HP</label>
+                            <input 
+                              type="text" 
+                              value={newDocForm.phone}
+                              onChange={e => setNewDocForm({ ...newDocForm, phone: e.target.value })}
+                              placeholder="Contoh: 0812-9999-8888"
+                              style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 12, outline: "none" }}
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                          <div>
+                            <label style={{ fontSize: 10.5, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 4 }}>Jam Praktik</label>
+                            <input 
+                              type="text" 
+                              value={newDocForm.time}
+                              onChange={e => setNewDocForm({ ...newDocForm, time: e.target.value })}
+                              style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 12, outline: "none" }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 10.5, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 4 }}>Tema Warna</label>
+                            <select 
+                              value={newDocForm.color}
+                              onChange={e => setNewDocForm({ ...newDocForm, color: e.target.value })}
+                              style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 12, outline: "none", background: "#fff" }}
+                            >
+                              <option value="#0d9488">Teal (Hijau Toska)</option>
+                              <option value="#8b5cf6">Purple (Ungu)</option>
+                              <option value="#f97316">Orange (Jingga)</option>
+                              <option value="#ec4899">Pink (Merah Muda)</option>
+                              <option value="#22c55e">Green (Hijau)</option>
+                              <option value="#3b82f6">Blue (Biru)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", gap: 8, marginTop: 6, justifyContent: "flex-end" }}>
+                          <button 
+                            type="button"
+                            onClick={() => setShowAddForm(false)}
+                            style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #cbd5e1", background: "none", fontSize: 11.5, fontWeight: 700, cursor: "pointer", color: "#475569" }}>
+                            Batal
+                          </button>
+                          <button 
+                            type="submit"
+                            style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "#0d9488", fontSize: 11.5, fontWeight: 800, cursor: "pointer", color: "#fff" }}>
+                            Simpan Dokter
+                          </button>
+                        </div>
+                      </form>
+                    )}
                   </div>
-                ))}
+                )}
+
+                {/* Doctor List Wrapper */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, maxHeight: 300, overflowY: "auto" }}>
+                  {doctorsList.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "24px 0", color: "#64748b", fontSize: 12 }}>
+                      Belum ada dokter di jadwal. Silakan tambahkan dokter bertugas.
+                    </div>
+                  ) : (
+                    doctorsList.map((doc, idx) => (
+                      <div key={idx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f8fafc", padding: 14, borderRadius: 14, border: "1px solid #e2e8f0" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <div style={{ width: 42, height: 42, borderRadius: "50%", background: doc.bg, color: doc.color, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 14 }}>
+                            {doc.initials}
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>{doc.name}</div>
+                            <div style={{ fontSize: 11, color: doc.color, fontWeight: 700 }}>{doc.poli}</div>
+                            <div style={{ fontSize: 10.5, color: "#64748b" }}>{doc.sip || "SIP-2026-001"} • {doc.phone || "0812-1111-2222"}</div>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: "right", display: "flex", alignItems: "center", gap: 10 }}>
+                          <div>
+                            {currentUserEmail.toLowerCase() === "admin@klinikai.co.id" ? (
+                              <select 
+                                value={doc.status}
+                                onChange={(e) => handleUpdateDoctorStatus(doc.id, e.target.value)}
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  padding: "3px 6px",
+                                  borderRadius: 8,
+                                  border: "1px solid #cbd5e1",
+                                  background: doc.status === "Aktif" ? "#dcfce7" : doc.status === "Cuti" ? "#fff7ed" : "#f1f5f9",
+                                  color: doc.status === "Aktif" ? "#166534" : doc.status === "Cuti" ? "#c2410c" : "#475569",
+                                  cursor: "pointer",
+                                  outline: "none"
+                                }}
+                              >
+                                <option value="Aktif">Aktif</option>
+                                <option value="Cuti">Cuti</option>
+                                <option value="Nonaktif">Nonaktif</option>
+                              </select>
+                            ) : (
+                              <span style={{ 
+                                background: doc.status === "Aktif" ? "#dcfce7" : doc.status === "Cuti" ? "#fff7ed" : "#f1f5f9", 
+                                color: doc.status === "Aktif" ? "#166534" : doc.status === "Cuti" ? "#c2410c" : "#475569", 
+                                padding: "3px 10px", 
+                                borderRadius: 12, 
+                                fontSize: 10.5, 
+                                fontWeight: 800 
+                              }}>
+                                {doc.status}
+                              </span>
+                            )}
+                            <div style={{ fontSize: 11, color: "#0f172a", fontWeight: 700, marginTop: 4 }}>{doc.time}</div>
+                          </div>
+                          {currentUserEmail.toLowerCase() === "admin@klinikai.co.id" && (
+                            <button 
+                              onClick={() => handleDeleteDoctor(doc.id)}
+                              style={{ border: "none", background: "none", color: "#ef4444", cursor: "pointer", fontSize: 15, padding: 4 }}
+                              title="Hapus dari Jadwal"
+                            >
+                              🗑️
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             ) : selectedDoctorModal && (
               <div style={{ textAlign: "center" }}>
@@ -624,28 +930,44 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {doctorsList.slice(0, 4).map((doc, idx) => (
-              <div 
-                key={idx} 
-                onClick={() => setSelectedDoctorModal(doc)}
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fafafa", padding: 10, borderRadius: 14, cursor: "pointer", transition: "all 0.2s" }}
-                onMouseEnter={e => e.currentTarget.style.background = "#f1f5f9"}
-                onMouseLeave={e => e.currentTarget.style.background = "#fafafa"}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: doc.bg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, color: doc.color, fontSize: 12 }}>
-                    {doc.initials}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: "#0f172a" }}>{doc.name}</div>
-                    <div style={{ fontSize: 10.5, color: "#64748b" }}>{doc.poli}</div>
-                  </div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <span style={{ background: idx === 0 ? "#dcfce7" : idx === 1 ? "#fff7ed" : idx === 2 ? "#f3e8ff" : "#dbeafe", color: idx === 0 ? "#166534" : idx === 1 ? "#c2410c" : idx === 2 ? "#6b21a8" : "#1d4ed8", padding: "2px 8px", borderRadius: 10, fontSize: 10, fontWeight: 800, display: "inline-block" }}>{doc.time}</span>
-                  <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>👥 {doc.count} pasien</div>
-                </div>
+            {doctorsList.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "20px 0", color: "#64748b", fontSize: 12 }}>
+                Belum ada dokter bertugas.
               </div>
-            ))}
+            ) : (
+              doctorsList.slice(0, 4).map((doc, idx) => (
+                <div 
+                  key={idx} 
+                  onClick={() => setSelectedDoctorModal(doc)}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fafafa", padding: 10, borderRadius: 14, cursor: "pointer", transition: "all 0.2s" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#f1f5f9"}
+                  onMouseLeave={e => e.currentTarget.style.background = "#fafafa"}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: doc.bg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, color: doc.color, fontSize: 12 }}>
+                      {doc.initials}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: "#0f172a" }}>{doc.name}</div>
+                      <div style={{ fontSize: 10.5, color: "#64748b" }}>{doc.poli}</div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <span style={{ 
+                      background: doc.status === "Aktif" ? "#dcfce7" : doc.status === "Cuti" ? "#fff7ed" : "#f1f5f9", 
+                      color: doc.status === "Aktif" ? "#166534" : doc.status === "Cuti" ? "#c2410c" : "#475569", 
+                      padding: "2px 8px", 
+                      borderRadius: 10, 
+                      fontSize: 10, 
+                      fontWeight: 800, 
+                      display: "inline-block" 
+                    }}>
+                      {doc.status}
+                    </span>
+                    <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>⏱️ {doc.time}</div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 

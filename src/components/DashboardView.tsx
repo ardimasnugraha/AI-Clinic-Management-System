@@ -13,6 +13,15 @@ interface DashboardViewProps {
   onNavigateTab?: (tabName: string) => void;
 }
 
+const DOCTOR_PRESETS = [
+  { name: "dr. Maya Lestari", poli: "Umum", sip: "SIP-2024-001", phone: "0812-1111-2222", color: "#0d9488" },
+  { name: "drg. Sari Dewi", poli: "Gigi", sip: "SIP-2024-002", phone: "0812-3333-4444", color: "#8b5cf6" },
+  { name: "dr. Ahmad Rizki", poli: "Jantung", sip: "SIP-2024-003", phone: "0812-5555-6666", color: "#f97316" },
+  { name: "dr. Laila Rahmawati", poli: "Kulit", sip: "SIP-2024-004", phone: "0812-7777-8888", color: "#ec4899" },
+  { name: "dr. Rudi Setiawan", poli: "Anak", sip: "SIP-2024-005", phone: "0812-9999-0000", color: "#22c55e" },
+  { name: "dr. Hendra Kusuma", poli: "Mata", sip: "SIP-2024-006", phone: "0811-2233-4455", color: "#3b82f6" }
+];
+
 export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
   const [activeChartTab, setActiveChartTab] = useState<"kunjungan" | "pendapatan">("kunjungan");
   const [timeFilter, setTimeFilter] = useState<"Hari Ini" | "Minggu Ini" | "Bulan Ini">("Hari Ini");
@@ -399,7 +408,42 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
                       </button>
                     ) : (
                       <form onSubmit={handleAddDoctor} style={{ background: "#f8fafc", padding: 16, borderRadius: 16, border: "1px solid #e2e8f0", display: "flex", flexDirection: "column", gap: 10 }}>
-                        <div style={{ fontSize: 12.5, fontWeight: 900, color: "#0f172a" }}>Tambah Dokter Baru</div>
+                        <div style={{ fontSize: 12.5, fontWeight: 900, color: "#0f172a", marginBottom: 2 }}>Tambah Dokter Baru</div>
+                        <div style={{ fontSize: 10.5, fontWeight: 700, color: "#64748b", marginBottom: 2 }}>Pilih Cepat Dokter Terdaftar:</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                          {DOCTOR_PRESETS.map((preset) => (
+                            <button
+                              key={preset.name}
+                              type="button"
+                              onClick={() => setNewDocForm({
+                                name: preset.name,
+                                poli: preset.poli,
+                                sip: preset.sip,
+                                phone: preset.phone,
+                                color: preset.color,
+                                status: "Aktif",
+                                time: "08:00 - 16:00"
+                              })}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                                padding: "6px 10px",
+                                borderRadius: 14,
+                                border: `1.5px solid ${newDocForm.name === preset.name ? preset.color : "#e2e8f0"}`,
+                                background: newDocForm.name === preset.name ? `${preset.color}15` : "#fff",
+                                color: newDocForm.name === preset.name ? preset.color : "#475569",
+                                fontSize: 10.5,
+                                fontWeight: 800,
+                                cursor: "pointer",
+                                transition: "all 0.2s"
+                              }}
+                            >
+                              <span style={{ width: 6, height: 6, borderRadius: "50%", background: preset.color }} />
+                              {preset.name.split(". ")[1] || preset.name}
+                            </button>
+                          ))}
+                        </div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                           <div>
                             <label style={{ fontSize: 10.5, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 4 }}>Nama Dokter</label>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Sparkles, Send, Brain, Bot, User, Activity, AlertCircle, Calendar, Plus, MessageSquare } from "lucide-react";
+import { Sparkles, Send, Brain, Bot, User, Activity, AlertCircle, Calendar, Plus, MessageSquare, Key } from "lucide-react";
 
 interface Message {
   sender: "user" | "ai";
@@ -66,7 +66,18 @@ export default function AiAssistantView() {
   ]);
   const [inputText, setInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [apiKey, setApiKey] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const envKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    if (envKey) {
+      setApiKey(envKey);
+    } else {
+      const savedKey = localStorage.getItem("gemini_api_key_v1");
+      if (savedKey) setApiKey(savedKey);
+    }
+  }, []);
 
   const getAiResponse = (input: string): string => {
     const text = input.toLowerCase();
@@ -98,7 +109,7 @@ export default function AiAssistantView() {
     return "Terima kasih atas pertanyaannya. Sebagai Asisten AI Kesehatan, saya sarankan untuk selalu berkonsultasi langsung dengan dokter spesialis di Klinik Sehat Sentosa untuk diagnosis klinis yang akurat dan peresepan obat secara tepat sesuai kondisi medis pasien.";
   };
 
-  const handleSendMessage = (text: string) => {
+  const handleSendMessage = async (text: string) => {
     if (!text.trim()) return;
 
     const userMsg: Message = {
@@ -111,16 +122,58 @@ export default function AiAssistantView() {
     setInputText("");
     setIsTyping(true);
 
-    setTimeout(() => {
-      const responseText = getAiResponse(text);
+    try {
+      let responseText = "";
+
+      if (apiKey.trim()) {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [{
+                  text: `Kamu adalah Asisten AI Klinis dari Klinik Sehat Sentosa yang sangat ahli di bidang medis, kesehatan, obat-obatan, dan operasional klinik. Jawablah pertanyaan baru berikut dengan sangat ramah, profesional, menggunakan bahasa Indonesia yang baik, terstruktur, dan akurat.\n\nRiwayat percakapan sebelumnya:\n${messages.map(m => `${m.sender === "user" ? "Pasien/Staf" : "AI"}: ${m.text}`).join("\n")}\n\nPertanyaan Baru: ${text}`
+                }]
+              }
+            ]
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error("Gagal menghubungi Gemini API. Pastikan API Key Anda valid.");
+        }
+
+        const data = await response.json();
+        const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (generatedText) {
+          responseText = generatedText;
+        } else {
+          responseText = "Maaf, respon tidak dapat dibaca dari Gemini API.";
+        }
+      } else {
+        responseText = getAiResponse(text);
+      }
+
       const aiMsg: Message = {
         sender: "ai",
         text: responseText,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setMessages((prev) => [...prev, aiMsg]);
+    } catch (err: any) {
+      const errorMsg: Message = {
+        sender: "ai",
+        text: `⚠️ Gagal memproses: ${err.message || "Pastikan koneksi internet Anda aktif dan API Key Google AI Studio Anda benar."}`,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
       setIsTyping(false);
-    }, 1200);
+    }
   };
 
   useEffect(() => {
@@ -155,6 +208,53 @@ export default function AiAssistantView() {
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e", display: "inline-block", boxShadow: "0 0 10px #22c55e" }} />
           AI Engine Active
         </div>
+      </div>
+
+      {/* Google AI Studio API Key Configuration Row */}
+      <div style={{
+        background: "#fff",
+        border: "1px solid #e2e8f0",
+        borderRadius: 16,
+        padding: "14px 20px",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.02)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 16,
+        flexWrap: "wrap"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: "#f3e8ff", display: "flex", alignItems: "center", justifyContent: "center", color: "#a855f7" }}>
+            <Key style={{ width: 18, height: 18 }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>Koneksi Google AI Studio (Gemini API)</div>
+            <div style={{ fontSize: 11, color: "#64748b" }}>
+              {apiKey.trim() 
+                ? "Terhubung ke Google AI Studio Live Engine. Respon AI akan menggunakan model Gemini asli."
+                : "Masukkan API Key Anda untuk mengaktifkan AI live. Jika kosong, asisten menggunakan simulasi lokal."
+              }
+            </div>
+          </div>
+        </div>
+        <input
+          type="password"
+          value={apiKey}
+          onChange={(e) => {
+            setApiKey(e.target.value);
+            localStorage.setItem("gemini_api_key_v1", e.target.value);
+          }}
+          placeholder="Masukkan Google AI Studio API Key Anda (AIZAsy...)"
+          style={{
+            width: 320,
+            padding: "9px 14px",
+            borderRadius: 10,
+            border: "1.5px solid #cbd5e1",
+            fontSize: 12.5,
+            outline: "none",
+            transition: "all 0.15s"
+          }}
+        />
       </div>
 
       {/* Main Content Grid */}

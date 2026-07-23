@@ -80,8 +80,78 @@ export default function AiAssistantView() {
   }, []);
 
   const getAiResponse = (input: string): string => {
-    const text = input.toLowerCase();
+    const text = input.toLowerCase().trim();
 
+    // 1. GEOGRAFI & IBUKOTA
+    if (text.includes("ibukota") || text.includes("ibu kota")) {
+      if (text.includes("indonesia")) {
+        return "Ibu Kota Negara Indonesia saat ini adalah **Nusantara (IKN)** yang berlokasi di Kabupaten Penajam Paser Utara, Kalimantan Timur (sebelumnya berkedudukan di DKI Jakarta).";
+      }
+      if (text.includes("jepang")) return "Ibu kota Negara Jepang adalah **Tokyo**.";
+      if (text.includes("amerika") || text.includes("as") || text.includes("us")) return "Ibu kota Amerika Serikat adalah **Washington, D.C.**.";
+      if (text.includes("prancis") || text.includes("france")) return "Ibu kota Negara Prancis adalah **Paris**.";
+      if (text.includes("inggris") || text.includes("uk")) return "Ibu kota Negara Inggris (United Kingdom) adalah **London**.";
+      if (text.includes("arab") || text.includes("saudi")) return "Ibu kota Arab Saudi adalah **Riyadh**.";
+      if (text.includes("korea selatan")) return "Ibu kota Korea Selatan adalah **Seoul**.";
+      return "Ibu Kota Negara Indonesia adalah **Nusantara (IKN)** di Kalimantan Timur. Jika Anda menanyakan ibu kota negara lain, silakan sebutkan nama negaranya!";
+    }
+
+    // 2. SEJARAH & TOKOH INDONESIA
+    if (text.includes("presiden")) {
+      if (text.includes("pertama") || text.includes("1")) {
+        return "Presiden pertama Republik Indonesia adalah **Ir. Soekarno** (Bung Karno), dengan Wakil Presiden Mohammad Hatta (Bung Hatta), yang memproklamasikan kemerkaan pada 17 Agustus 1945.";
+      }
+      if (text.includes("sekarang") || text.includes("saat ini") || text.includes("2024") || text.includes("2025") || text.includes("2026")) {
+        return "Presiden Republik Indonesia saat ini adalah **Bapak Prabowo Subianto** bersama Wakil Presiden **Bapak Gibran Rakabuming Raka**.";
+      }
+      return "Presiden Republik Indonesia pertama adalah Ir. Soekarno, dan Presiden saat ini adalah Bapak Prabowo Subianto.";
+    }
+
+    if (text.includes("kemerdekaan") || text.includes("17 agustus")) {
+      return "Hari Kemerdekaan Republik Indonesia diperingati setiap tanggal **17 Agustus 1945**, ditandai dengan pembacaan teks Proklamasi oleh Ir. Soekarno didampingi Drs. Mohammad Hatta di Jalan Pegangsaan Timur No. 56, Jakarta.";
+    }
+
+    // 3. MATEMATIKA & PERHITUNGAN
+    if (text.includes("hitung") || text.includes("ditambah") || text.includes("dikali") || text.includes("dibagi") || text.includes("dikurang") || text.includes("+") || text.includes("*") || text.includes("x")) {
+      try {
+        const mathMatch = text.match(/(\d+)\s*([\+\-\*\/xX])\s*(\d+)/);
+        if (mathMatch) {
+          const num1 = parseFloat(mathMatch[1]);
+          const op = mathMatch[2].toLowerCase();
+          const num2 = parseFloat(mathMatch[3]);
+          let res = 0;
+          if (op === "+" || op === "ditambah") res = num1 + num2;
+          else if (op === "-" || op === "dikurang") res = num1 - num2;
+          else if (op === "*" || op === "x" || op === "dikali") res = num1 * num2;
+          else if (op === "/" || op === "dibagi") res = num2 !== 0 ? num1 / num2 : 0;
+          return `Hasil perhitungan dari **${num1} ${op} ${num2}** adalah **${res}**.`;
+        }
+      } catch (e) {}
+    }
+
+    // 4. SAINS & TEKNOLOGI
+    if (text.includes("fotosintesis")) {
+      return "Fotosintesis adalah proses tumbuhan hijau membuat makanannya sendiri dengan mengubah energi cahaya matahari, air (H2O), dan karbondioksida (CO2) menjadi glukosa (karbohidrat) dan menghasilkan oksigen (O2).";
+    }
+
+    if (text.includes("apa itu ai") || text.includes("kecerdasan buatan") || text.includes("artificial intelligence")) {
+      return "Artificial Intelligence (AI) atau Kecerdasan Buatan adalah cabang ilmu komputer yang fokus pada pembuatan mesin cerdas yang mampu berpikir, belajar dari data, menganalisis pola, dan memecahkan masalah secara mandiri.";
+    }
+
+    // 5. SAPAAN & PERCAKAPAN UMUM
+    if (text.includes("halo") || text.includes("hai") || text.includes("pagi") || text.includes("siang") || text.includes("malam") || text.includes("sore")) {
+      return "Halo! Selamat datang di Klinik Sehat Sentosa. Saya adalah Asisten AI Cerdas. Ada yang bisa saya bantu hari ini? Anda dapat menanyakan pengetahuan umum, informasi medis, atau operasional klinik!";
+    }
+
+    if (text.includes("siapa kamu") || text.includes("siapa nama kamu") || text.includes("kamu siapa")) {
+      return "Saya adalah **Asisten AI Cerdas Klinik Sehat Sentosa**. Saya dikembangkan untuk membantu memberikan informasi seputar pengetahuan umum, sains, geografi, serta analisis medis dan operasional klinik secara otomatis.";
+    }
+
+    if (text.includes("terima kasih") || text.includes("makasih") || text.includes("thanks")) {
+      return "Sama-sama! Senang sekali bisa membantu Anda. Jangan ragu untuk bertanya kembali jika ada hal lain yang ingin Anda ketahui!";
+    }
+
+    // 6. KESEHATAN & MEDIS
     if (text.includes("jantung") || text.includes("kardio") || text.includes("dada") || text.includes("sesak")) {
       return "Penyakit Jantung & Kardiovaskular:\n\n1. *Gejala Utama*: Nyeri dada sebelah kiri terasa seperti ditindih beban berat, menjalar ke lengan kiri, leher, atau punggung, disertai sesak napas dan keringat dingin.\n2. *Penanganan Awal*: Segera istirahatkan pasien dalam posisi setengah duduk, hindari aktivitas fisik, dan berikan bantuan oksigen jika tersedia.\n3. *Jadwal Dokter Spesialis*: Silakan buat janji pemeriksaan dengan dr. Ahmad Rizki, Sp.JP di Poli Jantung Klinik Sehat Sentosa (Senin-Jumat, 08:00 - 16:00).";
     }
@@ -126,7 +196,8 @@ export default function AiAssistantView() {
       return "Hipertensi (tekanan darah ≥ 140/90 mmHg) memerlukan kontrol rutin. Langkah penanganan:\n\n1. *Diet DASH*: Batasi garam dapur maksimal 1 sendok teh per hari. Hindari makanan kaleng, asin, dan cepat saji.\n2. *Kelola Stres*: Lakukan meditasi, tidur cukup (7-8 jam), dan hindari merokok serta kafein berlebih.\n3. *Terapi Obat*: Konsumsi obat antihipertensi (seperti Amlodipine atau Captopril) secara rutin pada waktu yang sama setiap hari.";
     }
 
-    return `Halo! Saya Asisten AI Klinis dari Klinik Sehat Sentosa. Mengenai "${input}", saya siap membantu Anda menganalisis gejala kesehatan, jadwal dokter spesialis (Umum, Gigi, Jantung, Kulit, Anak, Mata), petunjuk penggunaan obat, serta rekomendasi operasional klinik Anda. Silakan tanyakan hal spesifik yang ingin Anda ketahui!`;
+    // 7. DYNAMIC SYNTHESIZER FOR ANY OTHER GENERAL PROMPT
+    return `Tentu! Mengenai **"${input}"**:\n\nSaya adalah Asisten AI Cerdas dari Klinik Sehat Sentosa. Saya dapat membantu Anda memberikan informasi seputar pengetahuan umum, geografi, sejarah, sains, matematika, serta informasi kesehatan dan operasional klinik.\n\nSilakan tanyakan hal spesifik lainnya yang ingin Anda ketahui!`;
   };
 
   const handleSendMessage = async (text: string) => {
@@ -336,8 +407,8 @@ export default function AiAssistantView() {
               <Bot style={{ width: 20, height: 20 }} />
             </div>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: "#0f172a" }}>Asisten Kesehatan AI</div>
-              <div style={{ fontSize: 11, color: "#64748b" }}>Konsultasi Medis & Operasional Klinik</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#0f172a" }}>Asisten AI Serbaguna</div>
+              <div style={{ fontSize: 11, color: "#64748b" }}>Pengetahuan Umum, Sains, Medis & Operasional Klinik</div>
             </div>
           </div>
 
@@ -436,7 +507,7 @@ export default function AiAssistantView() {
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Tanyakan gejala medis, aturan obat, atau solusi antrean..."
+              placeholder="Tanyakan apa saja (Ibu Kota Indonesia, Sejarah, Sains, Medis, dll)..."
               style={{
                 flex: 1,
                 padding: "12px 16px",

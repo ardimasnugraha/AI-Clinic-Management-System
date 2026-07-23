@@ -124,35 +124,55 @@ export default function AiAssistantView() {
 
     try {
       let responseText = "";
+      const cleanKey = apiKey.trim();
 
-      if (apiKey.trim()) {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: "user",
-                parts: [{
-                  text: `Kamu adalah Asisten AI Klinis dari Klinik Sehat Sentosa yang sangat ahli di bidang medis, kesehatan, obat-obatan, dan operasional klinik. Jawablah pertanyaan baru berikut dengan sangat ramah, profesional, menggunakan bahasa Indonesia yang baik, terstruktur, dan akurat.\n\nRiwayat percakapan sebelumnya:\n${messages.map(m => `${m.sender === "user" ? "Pasien/Staf" : "AI"}: ${m.text}`).join("\n")}\n\nPertanyaan Baru: ${text}`
-                }]
-              }
-            ]
-          })
-        });
+      if (cleanKey) {
+        const modelsToTry = [
+          "gemini-2.5-flash",
+          "gemini-2.0-flash",
+          "gemini-1.5-flash",
+          "gemini-1.5-pro"
+        ];
 
-        if (!response.ok) {
-          throw new Error("Gagal menghubungi Gemini API. Pastikan API Key Anda valid.");
+        let lastErr = "";
+        let data: any = null;
+
+        for (const model of modelsToTry) {
+          try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-goog-api-key": cleanKey
+              },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    role: "user",
+                    parts: [{
+                      text: `Kamu adalah Asisten AI Klinis dari Klinik Sehat Sentosa yang sangat ahli di bidang medis, kesehatan, obat-obatan, dan operasional klinik. Jawablah pertanyaan baru berikut dengan sangat ramah, profesional, menggunakan bahasa Indonesia yang baik, terstruktur, dan akurat.\n\nRiwayat percakapan sebelumnya:\n${messages.map(m => `${m.sender === "user" ? "Pasien/Staf" : "AI"}: ${m.text}`).join("\n")}\n\nPertanyaan Baru: ${text}`
+                    }]
+                  }
+                ]
+              })
+            });
+
+            if (res.ok) {
+              data = await res.json();
+              break;
+            } else {
+              const errBody = await res.json().catch(() => ({}));
+              lastErr = errBody.error?.message || `HTTP ${res.status}: ${res.statusText}`;
+            }
+          } catch (e: any) {
+            lastErr = e.message || "Gagal menghubungi server.";
+          }
         }
 
-        const data = await response.json();
-        const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (generatedText) {
-          responseText = generatedText;
+        if (data && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+          responseText = data.candidates[0].content.parts[0].text;
         } else {
-          responseText = "Maaf, respon tidak dapat dibaca dari Gemini API.";
+          throw new Error(lastErr || "Gagal memperoleh respon dari Gemini API.");
         }
       } else {
         responseText = getAiResponse(text);
@@ -237,24 +257,49 @@ export default function AiAssistantView() {
             </div>
           </div>
         </div>
-        <input
-          type="password"
-          value={apiKey}
-          onChange={(e) => {
-            setApiKey(e.target.value);
-            localStorage.setItem("gemini_api_key_v1", e.target.value);
-          }}
-          placeholder="Masukkan Google AI Studio API Key Anda (AIZAsy...)"
-          style={{
-            width: 320,
-            padding: "9px 14px",
-            borderRadius: 10,
-            border: "1.5px solid #cbd5e1",
-            fontSize: 12.5,
-            outline: "none",
-            transition: "all 0.15s"
-          }}
-        />
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input
+            type="password"
+            value={apiKey}
+            onChange={(e) => {
+              setApiKey(e.target.value);
+              localStorage.setItem("gemini_api_key_v1", e.target.value);
+            }}
+            placeholder="Masukkan Google AI Studio API Key (AQ.Ab8... / AIZaSy...)"
+            style={{
+              width: 280,
+              padding: "9px 14px",
+              borderRadius: 10,
+              border: "1.5px solid #cbd5e1",
+              fontSize: 12.5,
+              outline: "none",
+              transition: "all 0.15s"
+            }}
+          />
+          {apiKey && (
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.removeItem("gemini_api_key_v1");
+                const envKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
+                setApiKey(envKey);
+              }}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 10,
+                border: "1.5px solid #cbd5e1",
+                background: "#f8fafc",
+                color: "#475569",
+                fontSize: 11.5,
+                fontWeight: 700,
+                cursor: "pointer"
+              }}
+              title="Reset ke kunci dari file .env.local"
+            >
+              Reset Key
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Content Grid */}

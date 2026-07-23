@@ -107,6 +107,206 @@ export default function BillingView() {
     setShowPayModal(null);
   };
 
+  const handlePrintReceipt = (inv: Invoice) => {
+    const printWindow = window.open("", "_blank", "width=600,height=800");
+    if (!printWindow) {
+      alert("Gagal membuka jendela cetak. Pastikan pop-up diperbolehkan.");
+      return;
+    }
+
+    const itemsHtml = inv.items.map(item => `
+      <tr style="border-bottom: 1px dashed #e2e8f0;">
+        <td style="padding: 6px 0; font-size: 13px; color: #1e293b; text-align: left;">
+          ${item.name}
+          <div style="font-size: 11px; color: #64748b;">${item.category || "Layanan/Obat"}</div>
+        </td>
+        <td style="padding: 6px 0; text-align: right; font-size: 13px; font-weight: 700; color: #1e293b;">
+          Rp ${item.amount.toLocaleString("id-ID")}
+        </td>
+      </tr>
+    `).join("");
+
+    const receiptHtml = `
+      <html>
+        <head>
+          <title>Struk Pembayaran - ${inv.id}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+            body {
+              font-family: 'Inter', system-ui, sans-serif;
+              padding: 30px;
+              color: #1e293b;
+              max-width: 400px;
+              margin: 0 auto;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px dashed #cbd5e1;
+              padding-bottom: 16px;
+              margin-bottom: 16px;
+            }
+            .clinic-title {
+              font-size: 18px;
+              font-weight: 800;
+              color: #0d9488;
+              margin: 0;
+              text-transform: uppercase;
+            }
+            .clinic-subtitle {
+              font-size: 11px;
+              color: #64748b;
+              margin: 4px 0 0;
+            }
+            .meta-info {
+              font-size: 12px;
+              line-height: 1.6;
+              margin-bottom: 20px;
+            }
+            .meta-row {
+              display: flex;
+              justify-content: space-between;
+            }
+            .meta-label {
+              color: #64748b;
+              font-weight: 600;
+            }
+            .meta-val {
+              font-weight: 700;
+              color: #0f172a;
+            }
+            .table-title {
+              font-size: 12px;
+              font-weight: 800;
+              text-transform: uppercase;
+              color: #475569;
+              margin-bottom: 8px;
+              border-bottom: 1px solid #e2e8f0;
+              padding-bottom: 4px;
+            }
+            .items-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 16px;
+            }
+            .total-row {
+              border-top: 2px dashed #0d9488;
+              padding-top: 10px;
+              display: flex;
+              justify-content: space-between;
+              font-weight: 800;
+              font-size: 15px;
+              color: #0d9488;
+              margin-bottom: 24px;
+            }
+            .footer {
+              text-align: center;
+              font-size: 11px;
+              color: #94a3b8;
+              border-top: 1px solid #f1f5f9;
+              padding-top: 14px;
+              font-style: italic;
+            }
+            .barcode {
+              height: 35px;
+              background: #0f172a;
+              margin: 15px auto;
+              width: 80%;
+              border-radius: 4px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              letter-spacing: 4px;
+              color: #fff;
+              font-family: monospace;
+              font-size: 10px;
+            }
+            @media print {
+              body {
+                padding: 10px;
+              }
+              .no-print {
+                display: none;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1 class="clinic-title">Klinik Sehat Sentosa</h1>
+            <p class="clinic-subtitle">Cabang Semarang • Telp: (024) 8899-77</p>
+          </div>
+          
+          <div style="text-align: center; margin-bottom: 15px;">
+            <span style="font-size: 13px; font-weight: 800; color: #0d9488; background: #e0f2fe; padding: 4px 12px; border-radius: 20px;">
+              STRUK PEMBAYARAN LUNAS
+            </span>
+          </div>
+
+          <div class="meta-info">
+            <div class="meta-row">
+              <span class="meta-label">No. Invoice:</span>
+              <span class="meta-val">${inv.id}</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Pasien (RM):</span>
+              <span class="meta-val">${inv.patientName} (${inv.patientRm})</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Dokter:</span>
+              <span class="meta-val">${inv.doctorName}</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Tanggal:</span>
+              <span class="meta-val">${inv.date}</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Penjamin:</span>
+              <span class="meta-val">${inv.insurance || "Umum / Mandiri"}</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Metode Bayar:</span>
+              <span class="meta-val">${inv.paymentMethod || "Tunai"}</span>
+            </div>
+          </div>
+
+          <div class="table-title">Rincian Transaksi</div>
+          <table class="items-table">
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+
+          <div class="total-row">
+            <span>TOTAL BAYAR</span>
+            <span>Rp ${inv.total.toLocaleString("id-ID")}</span>
+          </div>
+
+          <div class="barcode">
+            ||||| | |||| |||| |||
+          </div>
+
+          <div class="footer">
+            Terima kasih atas kunjungan Anda.<br>Semoga lekas sembuh!
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() {
+                window.close();
+              }, 1000);
+            }
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(receiptHtml);
+    printWindow.document.close();
+
+    logAuditEvent("Cetak Struk Pembayaran", "Billing", `Mencetak struk kasir untuk invoice ${inv.id} atas nama ${inv.patientName}`);
+  };
+
   const totalIncome = invoices.filter(i => i.status === "Lunas").reduce((acc, curr) => acc + curr.total, 0);
   const pendingAmount = invoices.filter(i => i.status === "Belum Bayar").reduce((acc, curr) => acc + curr.total, 0);
   const paidCount = invoices.filter(i => i.status === "Lunas").length;
@@ -290,7 +490,7 @@ export default function BillingView() {
               <button onClick={() => setSelectedInvoice(null)} style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid #cbd5e1", background: "#fff", color: "#475569", fontWeight: 700, cursor: "pointer" }}>
                 Tutup
               </button>
-              <button onClick={() => alert("Mencetak Struk Kasir...")} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "#0d9488", color: "#fff", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+              <button onClick={() => handlePrintReceipt(selectedInvoice)} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "#0d9488", color: "#fff", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
                 <Printer style={{ width: 14, height: 14 }} /> Cetak Struk
               </button>
             </div>

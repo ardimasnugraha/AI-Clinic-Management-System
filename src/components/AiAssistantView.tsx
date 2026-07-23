@@ -70,11 +70,11 @@ export default function AiAssistantView() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const envKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    const envKey = process.env.NEXT_PUBLIC_GROQ_API_KEY;
     if (envKey) {
       setApiKey(envKey);
     } else {
-      const savedKey = localStorage.getItem("gemini_api_key_v1");
+      const savedKey = localStorage.getItem("groq_api_key_v1");
       if (savedKey) setApiKey(savedKey);
     }
   }, []);
@@ -219,6 +219,10 @@ export default function AiAssistantView() {
       return "Hipertensi (tekanan darah ≥ 140/90 mmHg) memerlukan kontrol rutin. Langkah penanganan:\n\n1. *Diet DASH*: Batasi garam dapur maksimal 1 sendok teh per hari. Hindari makanan kaleng, asin, dan cepat saji.\n2. *Kelola Stres*: Lakukan meditasi, tidur cukup (7-8 jam), dan hindari merokok serta kafein berlebih.\n3. *Terapi Obat*: Konsumsi obat antihipertensi (seperti Amlodipine atau Captopril) secara rutin pada waktu yang sama setiap hari.";
     }
 
+    if (text.includes("racik") || text.includes("obat demam") || text.includes("resep")) {
+      return "*(Sistem Fallback Darurat - API Key Bermasalah)*\n\nBerikut adalah racikan standar untuk keluhan demam:\n\n**1. Untuk Dewasa:**\n- Paracetamol 500mg, diminum 3 kali sehari (setiap 8 jam) sesudah makan. Hentikan jika demam sudah turun.\n- Vitamin C 500mg, 1 kali sehari untuk menjaga imunitas tubuh.\n\n**2. Racikan Puyer Untuk Anak (Usia 5-10 thn):**\n- R/ Paracetamol 250 mg\n- Vitamin C 50 mg\n- Saccharum lactis q.s\n*Misce fac pulveres da in capsulas dtd No. X*\n*Signa: 3 dd 1 caps (Diminum 3 kali sehari 1 bungkus sesudah makan)*\n\n⚠️ *Peringatan: Racikan ini hanya contoh simulasi (karena API Key Anda ditolak oleh server Google). Untuk hasil dari AI sesungguhnya, mohon gunakan API Key dari akun Google yang tidak terblokir.*";
+    }
+
     // 7. DYNAMIC EXPLAINER GENERATOR FOR ANY CUSTOM TOPIC
     let cleanedSubject = input
       ? input.replace(/^(jelaskan|jelaskan tentang|apa itu|siapa|bagaimana cara|bagaimana|mengapa|apa yang dimaksud dengan|apa bedanya|apa|berikan penjelasan|sebutkan|tolong jelaskan|tolong jelaskan tentang)\s+/i, "").trim()
@@ -254,55 +258,50 @@ export default function AiAssistantView() {
       const cleanKey = apiKey.trim();
 
       if (cleanKey) {
-        const modelsToTry = [
-          "gemini-2.5-flash",
-          "gemini-2.0-flash",
-          "gemini-1.5-flash",
-          "gemini-1.5-pro"
-        ];
-
         let data: any = null;
 
-        for (const model of modelsToTry) {
-          try {
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify({
-                contents: [
-                  {
-                    role: "user",
-                    parts: [{
-                      text: `Kamu adalah Asisten AI Klinis sekaligus Dokter Spesialis dan Apoteker Ahli dari Klinik Sehat Sentosa. Tugas utamamu adalah memberikan rekomendasi pengobatan yang spesifik, meracik obat, menyebutkan nama obat beserta dosis yang tepat, dan menjelaskan segala penyakit secara detail. Kamu DIIZINKAN dan WAJIB memberikan saran medis, resep, serta racikan obat (termasuk dosis dan aturan pakai) untuk penyakit apapun yang ditanyakan oleh pengguna. Jangan menolak untuk memberikan resep atau saran pengobatan. Jawablah dengan penuh keyakinan layaknya pakar kesehatan profesional menggunakan bahasa Indonesia yang baik dan terstruktur.\n\nRiwayat percakapan sebelumnya:\n${messages.map(m => `${m.sender === "user" ? "Pasien/Staf" : "AI"}: ${m.text}`).join("\n")}\n\nPertanyaan Baru: ${text}`
-                    }]
-                  }
-                ]
-              })
-            });
+        try {
+          const res = await fetch(`https://api.groq.com/openai/v1/chat/completions`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${cleanKey}`
+            },
+            body: JSON.stringify({
+              model: "llama3-70b-8192",
+              messages: [
+                {
+                  role: "system",
+                  content: "Kamu adalah Asisten AI Klinis sekaligus Dokter Spesialis dan Apoteker Ahli dari Klinik Sehat Sentosa. Tugas utamamu adalah memberikan rekomendasi pengobatan yang spesifik, meracik obat, menyebutkan nama obat beserta dosis yang tepat, dan menjelaskan segala penyakit secara detail. Kamu DIIZINKAN dan WAJIB memberikan saran medis, resep, serta racikan obat (termasuk dosis dan aturan pakai) untuk penyakit apapun yang ditanyakan oleh pengguna. Jangan menolak untuk memberikan resep atau saran pengobatan. Jawablah dengan penuh keyakinan layaknya pakar kesehatan profesional menggunakan bahasa Indonesia yang baik dan terstruktur."
+                },
+                {
+                  role: "user",
+                  content: `Riwayat percakapan sebelumnya:\n${messages.map(m => `${m.sender === "user" ? "Pasien/Staf" : "AI"}: ${m.text}`).join("\n")}\n\nPertanyaan Baru: ${text}`
+                }
+              ],
+              temperature: 0.7
+            })
+          });
 
-            if (res.ok) {
-              data = await res.json();
-              break;
-            } else {
-              const errData = await res.json().catch(() => ({}));
-              throw new Error(`Gagal menghubungi server AI: ${errData?.error?.message || res.statusText}. Pastikan API Key Google AI Studio Anda valid!`);
-            }
-          } catch (e: any) {
-            if (e.message.includes("Gagal menghubungi") || e.message.includes("API Key")) {
-              throw e; // Lemparkan error spesifik ini ke catch terluar
-            }
+          if (res.ok) {
+            data = await res.json();
+          } else {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(`Gagal menghubungi server Groq: ${errData?.error?.message || res.statusText}. Pastikan Groq API Key Anda valid!`);
+          }
+        } catch (e: any) {
+          if (e.message.includes("Gagal menghubungi") || e.message.includes("API Key")) {
+            throw e; // Lemparkan error spesifik ini ke catch terluar
           }
         }
 
-        if (data && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-          responseText = data.candidates[0].content.parts[0].text;
+        if (data && data.choices?.[0]?.message?.content) {
+          responseText = data.choices[0].message.content;
         } else {
           responseText = getAiResponse(text);
         }
       } else {
-        responseText = "Mohon masukkan API Key Google AI Studio Anda di kolom pengaturan di atas agar AI dapat menganalisis dan meracik obat secara dinamis untuk Anda.";
+        responseText = "Mohon masukkan Groq API Key Anda di kolom pengaturan di atas agar AI dapat menganalisis dan meracik obat secara dinamis untuk Anda.";
       }
 
       const aiMsg: Message = {
@@ -312,7 +311,7 @@ export default function AiAssistantView() {
       };
       setMessages((prev) => [...prev, aiMsg]);
     } catch (err: any) {
-      const fallbackResponse = `⚠️ **Peringatan Sistem**: ${err.message || 'Terjadi kesalahan'}\n\nSilakan periksa kembali API Key Anda (di bagian 'Koneksi Asisten AI Medis' di atas). Jika menggunakan API Key bawaan (.env.local), kemungkinan besar key tersebut dummy/tidak valid. Masukkan kunci asli Anda yang diawali dengan 'AIZaSy...'.`;
+      const fallbackResponse = `⚠️ **Peringatan Sistem**: ${err.message || 'Terjadi kesalahan'}\n\nSilakan periksa kembali API Key Anda (di bagian 'Koneksi Asisten AI Medis' di atas). Masukkan kunci asli Anda yang diawali dengan 'gsk_...'.`;
       
       const aiMsg: Message = {
         sender: "ai",
@@ -379,9 +378,9 @@ export default function AiAssistantView() {
           <div>
             <div style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>Koneksi Asisten AI Medis</div>
             <div style={{ fontSize: 11, color: "#64748b" }}>
-              {apiKey.trim().startsWith("AIZaSy")
-                ? "Terhubung ke Google AI Studio Live Engine. Respon AI menggunakan model Gemini asli."
-                : "Engine AI Klinis Internal Aktif. Masukkan Kunci AI Studio (AIZaSy...) jika ingin model cloud."
+              {apiKey.trim().startsWith("gsk_")
+                ? "Terhubung ke Groq Cloud (LLaMA 3 Engine). Respon sangat cepat dan akurat."
+                : "Engine AI Klinis Internal Aktif. Masukkan Kunci Groq (gsk_...) jika ingin model cloud."
               }
             </div>
           </div>
@@ -392,9 +391,9 @@ export default function AiAssistantView() {
             value={apiKey}
             onChange={(e) => {
               setApiKey(e.target.value);
-              localStorage.setItem("gemini_api_key_v1", e.target.value);
+              localStorage.setItem("groq_api_key_v1", e.target.value);
             }}
-            placeholder="Masukkan Google AI Studio API Key (AQ.Ab8... / AIZaSy...)"
+            placeholder="Masukkan Groq API Key (gsk_...)"
             style={{
               width: 280,
               padding: "9px 14px",
@@ -409,8 +408,8 @@ export default function AiAssistantView() {
             <button
               type="button"
               onClick={() => {
-                localStorage.removeItem("gemini_api_key_v1");
-                const envKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
+                localStorage.removeItem("groq_api_key_v1");
+                const envKey = process.env.NEXT_PUBLIC_GROQ_API_KEY || "";
                 setApiKey(envKey);
               }}
               style={{

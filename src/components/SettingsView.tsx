@@ -38,6 +38,7 @@ export default function SettingsView() {
   const [editingDoctor, setEditingDoctor] = useState<Doctor | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [patients, setPatients] = useState<any[]>([]);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
 
   // Form State for Add/Edit Doctor
   const [docForm, setDocForm] = useState({
@@ -86,6 +87,12 @@ export default function SettingsView() {
       if (!error) setPatients(data || []);
     }
     loadPatients();
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setCurrentUserEmail(user.email || "");
+      }
+    });
   }, []);
 
   const handleDeletePatient = async (rm: string) => {
@@ -315,11 +322,13 @@ export default function SettingsView() {
                   <p style={{ fontSize: 12, color: "#64748b", margin: "2px 0 0" }}>Kelola jadwal dokter pemeriksa, poli spesialisasi, dan nomor SIP</p>
                 </div>
 
-                <button 
-                  onClick={handleOpenAddDoctor}
-                  style={{ display: "flex", alignItems: "center", gap: 6, background: "#0d9488", color: "#fff", border: "none", borderRadius: 10, padding: "9px 18px", fontSize: 12.5, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 12px rgba(13,148,136,0.25)" }}>
-                  <Plus style={{ width: 16, height: 16 }} /> Tambah Dokter Baru
-                </button>
+                {currentUserEmail.toLowerCase() === "admin@klinikai.co.id" && (
+                  <button 
+                    onClick={handleOpenAddDoctor}
+                    style={{ display: "flex", alignItems: "center", gap: 6, background: "#0d9488", color: "#fff", border: "none", borderRadius: 10, padding: "9px 18px", fontSize: 12.5, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 12px rgba(13,148,136,0.25)" }}>
+                    <Plus style={{ width: 16, height: 16 }} /> Tambah Dokter Baru
+                  </button>
+                )}
               </div>
 
               {/* Doctor List Cards / Table */}
@@ -340,18 +349,20 @@ export default function SettingsView() {
                       </div>
                     </div>
 
-                    <div style={{ display: "flex", gap: 8, borderTop: "1px solid #e2e8f0", paddingTop: 10 }}>
-                      <button 
-                        onClick={() => handleOpenEditDoctor(doc)}
-                        style={{ flex: 1, padding: "6px 0", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", fontSize: 11.5, fontWeight: 700, color: "#475569", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
-                        <Edit2 style={{ width: 12, height: 12 }} /> Edit Data
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteDoctor(doc.id, doc.name)}
-                        style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #fecaca", background: "#fef2f2", fontSize: 11.5, fontWeight: 700, color: "#dc2626", cursor: "pointer" }}>
-                        <Trash2 style={{ width: 12, height: 12 }} />
-                      </button>
-                    </div>
+                    {currentUserEmail.toLowerCase() === "admin@klinikai.co.id" && (
+                      <div style={{ display: "flex", gap: 8, borderTop: "1px solid #e2e8f0", paddingTop: 10 }}>
+                        <button 
+                          onClick={() => handleOpenEditDoctor(doc)}
+                          style={{ flex: 1, padding: "6px 0", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", fontSize: 11.5, fontWeight: 700, color: "#475569", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                          <Edit2 style={{ width: 12, height: 12 }} /> Edit Data
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteDoctor(doc.id, doc.name)}
+                          style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #fecaca", background: "#fef2f2", fontSize: 11.5, fontWeight: 700, color: "#dc2626", cursor: "pointer" }}>
+                          <Trash2 style={{ width: 12, height: 12 }} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { guard } from '@/lib/medicalGuard';
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
+const GROQ_API_KEY = process.env.NEXT_PUBLIC_GROQ_API_KEY || process.env.GROQ_API_KEY || '';
 const GOOGLE_SEARCH_API_KEY = process.env.GOOGLE_SEARCH_API_KEY || '';
 const GOOGLE_SEARCH_CX = process.env.GOOGLE_SEARCH_CX || '';
 

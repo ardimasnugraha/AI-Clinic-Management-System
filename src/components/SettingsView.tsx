@@ -21,6 +21,15 @@ const sections = [
   { id: "tampilan", label: "Tampilan", icon: Palette, color: "#3b82f6" },
 ];
 
+const DOCTOR_PRESETS = [
+  { name: "dr. Maya Lestari", poli: "Umum", sip: "SIP-2024-001", phone: "0812-1111-2222", color: "#0d9488" },
+  { name: "drg. Sari Dewi", poli: "Gigi", sip: "SIP-2024-002", phone: "0812-3333-4444", color: "#8b5cf6" },
+  { name: "dr. Ahmad Rizki", poli: "Jantung", sip: "SIP-2024-003", phone: "0812-5555-6666", color: "#f97316" },
+  { name: "dr. Laila Rahmawati", poli: "Kulit", sip: "SIP-2024-004", phone: "0812-7777-8888", color: "#ec4899" },
+  { name: "dr. Rudi Setiawan", poli: "Anak", sip: "SIP-2024-005", phone: "0812-9999-0000", color: "#22c55e" },
+  { name: "dr. Hendra Kusuma", poli: "Mata", sip: "SIP-2024-006", phone: "0811-2233-4455", color: "#3b82f6" }
+];
+
 export default function SettingsView() {
   const [active, setActive] = useState("profil");
   const [saved, setSaved] = useState(false);
@@ -497,7 +506,45 @@ export default function SettingsView() {
                 <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", margin: 0 }}>
                   {editingDoctor ? "Edit Data Dokter" : "Tambah Dokter Baru"}
                 </h2>
-                <p style={{ fontSize: 12, color: "#64748b", margin: "2px 0 0" }}>Daftarkan tenaga medis dan tentukan poli spesialisasi</p>
+                <p style={{ fontSize: 12, color: "#64748b", margin: "2px 0 12px" }}>Daftarkan tenaga medis dan tentukan poli spesialisasi</p>
+                {!editingDoctor && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#475569", marginBottom: 6 }}>Pilih Cepat Dokter Terdaftar:</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {DOCTOR_PRESETS.map((preset) => (
+                        <button
+                          key={preset.name}
+                          type="button"
+                          onClick={() => setDocForm({
+                            name: preset.name,
+                            poli: preset.poli,
+                            sip: preset.sip,
+                            phone: preset.phone,
+                            color: preset.color,
+                            status: "Aktif"
+                          })}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
+                            padding: "6px 10px",
+                            borderRadius: 12,
+                            border: `1.5px solid ${docForm.name === preset.name ? preset.color : "#e2e8f0"}`,
+                            background: docForm.name === preset.name ? `${preset.color}15` : "#fff",
+                            color: docForm.name === preset.name ? preset.color : "#475569",
+                            fontSize: 11,
+                            fontWeight: 800,
+                            cursor: "pointer",
+                            transition: "all 0.15s"
+                          }}
+                        >
+                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: preset.color }} />
+                          {preset.name.split(". ")[1] || preset.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <button onClick={() => setShowAddDoctorModal(false)} style={{ border: "none", background: "#f1f5f9", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 13, color: "#64748b", fontWeight: 700 }}>✕</button>
             </div>

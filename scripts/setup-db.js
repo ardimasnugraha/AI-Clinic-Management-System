@@ -28,6 +28,44 @@ async function runSetup() {
   } else {
     console.log("✅ Default Clinic verified: Klinik Sehat Sentosa");
   }
+
+  console.log("Provisioning Google Demo Accounts...");
+
+  // 1. Buat Akun Demo dr. Maya Lestari
+  const { data: user1, error: err1 } = await supabase.auth.admin.createUser({
+    email: "dokter@sehatsentosa.com",
+    password: "Password123!",
+    email_confirm: true,
+    user_metadata: {
+      full_name: "dr. Maya Lestari",
+      clinic_name: "Klinik Sehat Sentosa",
+      role: "Dokter",
+      poli: "Umum"
+    }
+  });
+  if (err1) {
+    console.log("Status Akun Demo 1:", err1.message);
+  } else {
+    console.log("✅ Akun Demo 1 Terbuat & Terkonfirmasi:", user1.user.email);
+  }
+
+  // 2. Buat Akun Demo drg. Sari Dewi
+  const { data: user2, error: err2 } = await supabase.auth.admin.createUser({
+    email: "sari.dewi@sehatsentosa.com",
+    password: "Password123!",
+    email_confirm: true,
+    user_metadata: {
+      full_name: "drg. Sari Dewi",
+      clinic_name: "Klinik Sehat Sentosa",
+      role: "Dokter",
+      poli: "Gigi"
+    }
+  });
+  if (err2) {
+    console.log("Status Akun Demo 2:", err2.message);
+  } else {
+    console.log("✅ Akun Demo 2 Terbuat & Terkonfirmasi:", user2.user.email);
+  }
 }
 
 runSetup().catch(console.error);

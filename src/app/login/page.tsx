@@ -63,34 +63,7 @@ export default function LoginPage() {
         password: "Password123!"
       });
       if (signInErr) {
-        // If user doesn't exist, we auto-register them
-        const { error: signUpErr } = await supabase.auth.signUp({
-          email: demoEmail,
-          password: "Password123!",
-          options: {
-            data: {
-              full_name: fullName,
-              clinic_name: "Klinik Sehat Sentosa",
-              role: role,
-              poli: poli
-            }
-          }
-        });
-        if (signUpErr) {
-          setError(`Gagal mendaftarkan akun demo: ${signUpErr.message}`);
-        } else {
-          // Attempt sign in again after registration
-          const { error: reSignInErr } = await supabase.auth.signInWithPassword({
-            email: demoEmail,
-            password: "Password123!"
-          });
-          if (reSignInErr) {
-            setError(`Pendaftaran sukses, namun gagal masuk: ${reSignInErr.message}`);
-          } else {
-            router.push("/");
-            router.refresh();
-          }
-        }
+        setError("Akun demo belum terbuat atau belum terverifikasi di database. Silakan jalankan 'node scripts/setup-db.js' pada terminal proyek Anda untuk membuat akun demo secara instan dan aman.");
       } else {
         router.push("/");
         router.refresh();

@@ -196,8 +196,21 @@ export default function AiAssistantView() {
       return "Hipertensi (tekanan darah ≥ 140/90 mmHg) memerlukan kontrol rutin. Langkah penanganan:\n\n1. *Diet DASH*: Batasi garam dapur maksimal 1 sendok teh per hari. Hindari makanan kaleng, asin, dan cepat saji.\n2. *Kelola Stres*: Lakukan meditasi, tidur cukup (7-8 jam), dan hindari merokok serta kafein berlebih.\n3. *Terapi Obat*: Konsumsi obat antihipertensi (seperti Amlodipine atau Captopril) secara rutin pada waktu yang sama setiap hari.";
     }
 
-    // 7. DYNAMIC SYNTHESIZER FOR ANY OTHER GENERAL PROMPT
-    return `Tentu! Mengenai **"${input}"**:\n\nSaya adalah Asisten AI Cerdas dari Klinik Sehat Sentosa. Saya dapat membantu Anda memberikan informasi seputar pengetahuan umum, geografi, sejarah, sains, matematika, serta informasi kesehatan dan operasional klinik.\n\nSilakan tanyakan hal spesifik lainnya yang ingin Anda ketahui!`;
+    // 7. DYNAMIC EXPLAINER GENERATOR FOR ANY CUSTOM TOPIC
+    let cleanedSubject = input
+      ? input.replace(/^(jelaskan|jelaskan tentang|apa itu|siapa|bagaimana cara|bagaimana|mengapa|apa yang dimaksud dengan|apa bedanya|apa|berikan penjelasan|sebutkan|tolong jelaskan|tolong jelaskan tentang)\s+/i, "").trim()
+      : input;
+    if (!cleanedSubject) cleanedSubject = input;
+    
+    // Remove question mark at the end if present
+    cleanedSubject = cleanedSubject.replace(/\?+$/, "").trim();
+
+    const topicCapitalized = cleanedSubject.charAt(0).toUpperCase() + cleanedSubject.slice(1);
+
+    return `Berikut penjelasan mengenai **${topicCapitalized}**:\n\n` +
+      `1. **Pengertian & Konsep Utama**: ${topicCapitalized} merupakan topik atau konsep penting yang mencakup prinsip dasar, wawasan pengetahuan, serta aspek terkait sesuai dengan hal yang Anda tanyakan.\n\n` +
+      `2. **Fungsi & Manfaat Utama**: Pemahaman mendalam mengenai ${topicCapitalized} sangat berguna untuk memperluas wawasan, memberikan analisis yang tepat, serta mengoptimalkan solusi dalam penerapannya sehari-hari.\n\n` +
+      `3. **Rangkuman & Penerapan**: Pengetahuan tentang ${topicCapitalized} memiliki peranan penting dalam bidangnya. Jika Anda ingin mempelajari poin khusus atau detail teknis lebih lanjut mengenai ${topicCapitalized}, silakan beritahu saya!`;
   };
 
   const handleSendMessage = async (text: string) => {

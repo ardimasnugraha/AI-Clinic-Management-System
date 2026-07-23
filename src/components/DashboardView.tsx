@@ -30,6 +30,7 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
   const [patientCount, setPatientCount] = useState<number>(0);
   const [todayApptCount, setTodayApptCount] = useState<number>(0);
   const [activeQueueCount, setActiveQueueCount] = useState<number>(0);
+  const [servingQueues, setServingQueues] = useState<Array<{ ticket_no: string; poli: string }>>([]);
   const [todayRevenue, setTodayRevenue] = useState<number>(0);
 
   const [appointmentsList, setAppointmentsList] = useState<Array<{ time: string; name: string; type: string; status: string }>>([]);
@@ -84,16 +85,50 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
         }
 
         // 3. Fetch Queues & Pendapatan
-        const { data: qData } = await supabase.from("queues").select("*").eq("status", "menunggu");
+        const { data: qData } = await supabase.from("queues").select("*").in("status", ["menunggu", "dipanggil"]);
         if (qData) {
-          setActiveQueueCount(qData.length);
+          const activeCount = qData.filter((q: any) => q.status === "menunggu" || q.status === "dipanggil").length;
+          setActiveQueueCount(activeCount);
+          
+          const serving = qData.filter((q: any) => q.status === "dipanggil").map((q: any) => ({
+            ticket_no: q.ticket_no,
+            poli: q.poli
+          }));
+          setServingQueues(serving);
+
           setLiveQueue(qData.map((q: any) => ({
             no: q.ticket_no,
             name: q.patient_name,
             service: q.poli,
             time: q.created_time || "09:00",
-            status: q.status
+            status: q.status === "dipanggil" ? "Dipanggil" : q.status === "menunggu" ? "Menunggu" : q.status
           })));
+        } else {
+          // Fallback ke LocalStorage jika tabel Supabase tidak ada/error
+          const cached = localStorage.getItem("clinic_queue_v1");
+          if (cached) {
+            try {
+              const parsed = JSON.parse(cached);
+              const activeItems = parsed.filter((q: any) => q.status === "menunggu" || q.status === "dipanggil");
+              setActiveQueueCount(activeItems.length);
+              
+              const serving = activeItems.filter((q: any) => q.status === "dipanggil").map((q: any) => ({
+                ticket_no: q.no,
+                poli: q.poli
+              }));
+              setServingQueues(serving);
+
+              setLiveQueue(activeItems.map((q: any) => ({
+                no: q.no,
+                name: q.name,
+                service: q.poli,
+                time: q.createdTime || "09:00",
+                status: q.status === "dipanggil" ? "Dipanggil" : q.status === "menunggu" ? "Menunggu" : q.status
+              })));
+            } catch (e) {
+              console.warn("Gagal parse localStorage queue", e);
+            }
+          }
         }
 
         const { data: invData } = await supabase.from("invoices").select("total").eq("status", "Lunas");
@@ -349,7 +384,27 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
         </div>
 
         {/* Card 3: Antrian Aktif */}
-        <div style={{ background: "#fff", borderRadius: 20, border: "1px solid #f3e8ff", padding: "18px 20px", position: "relative", overflow: "hidden", boxShadow: "0 4px 16px rgba(139,92,246,0.04)" }}>
+        <div 
+          onClick={() => onNavigateTab?.("Antrean")}
+          onMouseEnter={e => {
+            e.currentTarget.style.transform = "translateY(-3px)";
+            e.currentTarget.style.boxShadow = "0 8px 24px rgba(139,92,246,0.1)";
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.transform = "none";
+            e.currentTarget.style.boxShadow = "0 4px 16px rgba(139,92,246,0.04)";
+          }}
+          style={{ 
+            background: "#fff", 
+            borderRadius: 20, 
+            border: "1px solid #f3e8ff", 
+            padding: "18px 20px", 
+            position: "relative", 
+            overflow: "hidden", 
+            boxShadow: "0 4px 16px rgba(139,92,246,0.04)", 
+            cursor: "pointer", 
+            transition: "all 0.2s ease" 
+          }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <div style={{ width: 44, height: 44, borderRadius: "50%", background: "linear-gradient(135deg, #a855f7, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(139,92,246,0.3)" }}>
               <Clock style={{ width: 22, height: 22, color: "#fff" }} />
@@ -359,9 +414,20 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
               <div style={{ fontSize: 28, fontWeight: 900, color: "#0f172a", lineHeight: 1.1 }}>{activeQueueCount}</div>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 11, fontWeight: 700, color: "#8b5cf6" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 11, fontWeight: 700, color: "#8b5cf6", flexWrap: "wrap" }}>
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#8b5cf6" }} />
-            <span>Sedang dilayani</span>
+            <span>Sedang dilayani:</span>
+            {servingQueues.length > 0 ? (
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {servingQueues.map((q, idx) => (
+                  <span key={idx} style={{ background: "#f3e8ff", color: "#6d28d9", padding: "2px 6px", borderRadius: 6, fontSize: 10, fontWeight: 800 }}>
+                    {q.ticket_no}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <span style={{ color: "#94a3b8", fontWeight: 500 }}>Tidak ada</span>
+            )}
           </div>
           {/* Sparkline Wave Purple */}
           <div style={{ marginTop: 6, height: 26, width: "100%" }}>
@@ -530,8 +596,10 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
                     <td style={{ padding: "8px 4px", color: "#64748b" }}>{q.time}</td>
                     <td style={{ padding: "8px 4px" }}>
                       <span style={{ 
-                        background: q.status === "Sedang Dilayani" ? "#dcfce7" : q.status === "Dipanggil" ? "#dbeafe" : "#fff7ed", 
-                        color: q.status === "Sedang Dilayani" ? "#15803d" : q.status === "Dipanggil" ? "#1d4ed8" : "#c2410c", 
+                        background: (q.status === "Sedang Dilayani" || q.status?.toLowerCase() === "sedang dilayani") ? "#dcfce7" : 
+                                    (q.status === "Dipanggil" || q.status?.toLowerCase() === "dipanggil") ? "#dbeafe" : "#fff7ed", 
+                        color: (q.status === "Sedang Dilayani" || q.status?.toLowerCase() === "sedang dilayani") ? "#15803d" : 
+                               (q.status === "Dipanggil" || q.status?.toLowerCase() === "dipanggil") ? "#1d4ed8" : "#c2410c", 
                         padding: "2px 8px", borderRadius: 12, fontSize: 9.5, fontWeight: 800 
                       }}>
                         {q.status}

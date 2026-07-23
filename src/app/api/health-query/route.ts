@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { guard } from '@/lib/medicalGuard';
 
-const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const GOOGLE_SEARCH_API_KEY = process.env.GOOGLE_SEARCH_API_KEY || '';
 const GOOGLE_SEARCH_CX = process.env.GOOGLE_SEARCH_CX || '';
 
@@ -19,51 +19,50 @@ Selalu tambahkan disclaimer bahwa informasi ini bersifat umum dan tidak menggant
 Jangan pernah memberikan dosis spesifik obat resep — arahkan ke dokter untuk hal tersebut.`;
 
 /**
- * Panggil Gemini API sebagai fallback / sumber utama jawaban kesehatan.
+ * Panggil Groq API sebagai fallback / sumber utama jawaban kesehatan.
  */
-async function askGemini(question: string, context?: string, clientApiKey?: string): Promise<string> {
-  const apiKeyToUse = clientApiKey || GEMINI_API_KEY;
+async function askGroq(question: string, context?: string, clientApiKey?: string): Promise<string> {
+  const apiKeyToUse = clientApiKey || GROQ_API_KEY;
   if (!apiKeyToUse) {
-    throw new Error('Gemini API key tidak ditemukan. Harap isi NEXT_PUBLIC_GEMINI_API_KEY di .env.local atau masukkan di antarmuka.');
+    throw new Error('Groq API key tidak ditemukan. Harap isi GROQ_API_KEY di .env.local.');
   }
 
   const userContent = context
     ? `Informasi tambahan dari pencarian web:\n${context}\n\nPertanyaan: ${question}`
     : `Pertanyaan: ${question}`;
 
-  const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
-  let lastError = '';
-
-  for (const model of models) {
-    try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKeyToUse}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            system_instruction: {
-              parts: [{ text: HEALTH_SYSTEM_PROMPT }]
-            },
-            contents: [{ role: 'user', parts: [{ text: userContent }] }]
-          })
-        }
-      );
-
-      if (res.ok) {
-        const data = await res.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return text;
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        lastError = errData?.error?.message || `Status ${res.status}`;
+  try {
+    const res = await fetch(
+      'https://api.groq.com/openai/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKeyToUse}`
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [
+            { role: 'system', content: HEALTH_SYSTEM_PROMPT },
+            { role: 'user', content: userContent }
+          ]
+        })
       }
-    } catch (e: any) {
-      lastError = e.message;
+    );
+
+    if (res.ok) {
+      const data = await res.json();
+      const text = data?.choices?.[0]?.message?.content;
+      if (text) return text;
+    } else {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData?.error?.message || `Status ${res.status}`);
     }
+  } catch (e: any) {
+    throw new Error(`Groq tidak tersedia: ${e.message}`);
   }
 
-  throw new Error(`Gemini tidak tersedia: ${lastError}`);
+  throw new Error('Gagal mendapatkan respon dari Groq.');
 }
 
 /**
@@ -125,20 +124,20 @@ export async function POST(req: Request) {
     // 2. Coba ambil data dari Google Custom Search (jika key tersedia)
     const searchSnippets = await tryGoogleSearch(`kesehatan ${question}`);
 
-    // 3. Tanya Gemini — dengan atau tanpa konteks dari Google Search
-    const geminiAnswer = await askGemini(question, searchSnippets || undefined, clientApiKey);
+    // 3. Tanya Groq — dengan atau tanpa konteks dari Google Search
+    const groqAnswer = await askGroq(question, searchSnippets || undefined, clientApiKey);
 
     // 4. Tambahkan label sumber jika pakai Google Search
     const sourceLabel = searchSnippets
       ? '\n\n---\n📡 *Jawaban didukung data pencarian web terkini.*'
-      : '\n\n---\n🤖 *Jawaban dari AI Kesehatan (model Gemini).*';
+      : '\n\n---\n🤖 *Jawaban dari AI Kesehatan (model Llama).*';
 
     const disclaimer = guardResult.disclaimer
       ? `\n\n⚠️ *${guardResult.disclaimer}*`
       : '';
 
     return NextResponse.json(
-      { answer: `${geminiAnswer}${sourceLabel}${disclaimer}` },
+      { answer: `${groqAnswer}${sourceLabel}${disclaimer}` },
       { status: 200 }
     );
   } catch (e: any) {

@@ -1,40 +1,149 @@
 // src/app/api/health-query/route.ts
 import { NextResponse } from 'next/server';
-import { search } from '@/lib/search';
 import { guard } from '@/lib/medicalGuard';
+
+const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
+const GOOGLE_SEARCH_API_KEY = process.env.GOOGLE_SEARCH_API_KEY || '';
+const GOOGLE_SEARCH_CX = process.env.GOOGLE_SEARCH_CX || '';
+
+const HEALTH_SYSTEM_PROMPT = `Kamu adalah Asisten AI Kesehatan profesional yang sangat ahli dalam:
+- Semua penyakit yang ada di dunia beserta gejala, penyebab, dan pengobatannya
+- Tips hidup sehat dan pola makan sehat
+- Penjelasan obat-obatan (fungsi, efek samping, interaksi)
+- Pencegahan penyakit dan promosi kesehatan
+- Informasi medis yang akurat dan terpercaya
+
+Jawablah SELALU dalam Bahasa Indonesia yang ramah, terstruktur, dan mudah dipahami.
+Gunakan format yang jelas dengan poin-poin atau nomor urut.
+Selalu tambahkan disclaimer bahwa informasi ini bersifat umum dan tidak menggantikan konsultasi dokter.
+Jangan pernah memberikan dosis spesifik obat resep — arahkan ke dokter untuk hal tersebut.`;
+
+/**
+ * Panggil Gemini API sebagai fallback / sumber utama jawaban kesehatan.
+ */
+async function askGemini(question: string, context?: string): Promise<string> {
+  if (!GEMINI_API_KEY) {
+    throw new Error('Gemini API key tidak ditemukan. Harap isi NEXT_PUBLIC_GEMINI_API_KEY di .env.local');
+  }
+
+  const userContent = context
+    ? `Informasi tambahan dari pencarian web:\n${context}\n\nPertanyaan: ${question}`
+    : `Pertanyaan: ${question}`;
+
+  const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+  let lastError = '';
+
+  for (const model of models) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: {
+              parts: [{ text: HEALTH_SYSTEM_PROMPT }]
+            },
+            contents: [{ role: 'user', parts: [{ text: userContent }] }]
+          })
+        }
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return text;
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        lastError = errData?.error?.message || `Status ${res.status}`;
+      }
+    } catch (e: any) {
+      lastError = e.message;
+    }
+  }
+
+  throw new Error(`Gemini tidak tersedia: ${lastError}`);
+}
+
+/**
+ * Cari di Google Custom Search (opsional — fallback ke Gemini jika tidak ada key).
+ */
+async function tryGoogleSearch(query: string): Promise<string | null> {
+  if (!GOOGLE_SEARCH_API_KEY || !GOOGLE_SEARCH_CX) return null;
+
+  try {
+    const url = new URL('https://www.googleapis.com/customsearch/v1');
+    url.searchParams.set('key', GOOGLE_SEARCH_API_KEY);
+    url.searchParams.set('cx', GOOGLE_SEARCH_CX);
+    url.searchParams.set('q', query);
+    url.searchParams.set('num', '5');
+
+    const res = await fetch(url.toString());
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const items: any[] = data.items || [];
+    if (!items.length) return null;
+
+    // Gabungkan snippet dari hasil pencarian
+    const snippets = items
+      .slice(0, 5)
+      .map((item: any, i: number) => `${i + 1}. [${item.title}]\n   ${item.snippet}\n   Sumber: ${item.link}`)
+      .join('\n\n');
+
+    return snippets;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * POST /api/health-query
- * Expects JSON body: { question: string }
- * Returns JSON: { answer?: string, error?: string }
+ * Body: { question: string }
+ * Response: { answer: string } | { error: string }
  */
 export async function POST(req: Request) {
   try {
-    const { question } = await req.json();
-    if (!question || typeof question !== 'string') {
-      return NextResponse.json({ error: 'Invalid request. "question" must be a non‑empty string.' }, { status: 400 });
+    const body = await req.json().catch(() => ({}));
+    const question: string = body?.question || '';
+
+    if (!question.trim()) {
+      return NextResponse.json(
+        { error: 'Pertanyaan tidak boleh kosong.' },
+        { status: 400 }
+      );
     }
 
-    // Guard against disallowed prescription queries
+    // 1. Guard — tolak permintaan dosis resep
     const guardResult = guard(question);
     if (!guardResult.allowed) {
-      return NextResponse.json({ error: guardResult.message }, { status: 403 });
+      return NextResponse.json({ answer: guardResult.message }, { status: 200 });
     }
 
-    // Perform a Google search for up‑to‑date health information
-    const { snippets, urls } = await search(question);
+    // 2. Coba ambil data dari Google Custom Search (jika key tersedia)
+    const searchSnippets = await tryGoogleSearch(`kesehatan ${question}`);
 
-    // Build a concise answer using the snippets
-    const compiled = snippets.length
-      ? `Berikut rangkuman hasil pencarian untuk pertanyaan Anda:\n\n${snippets.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
-      : 'Tidak menemukan hasil yang relevan.';
+    // 3. Tanya Gemini — dengan atau tanpa konteks dari Google Search
+    const geminiAnswer = await askGemini(question, searchSnippets || undefined);
 
-    // Append a disclaimer for safety
-    const answer = guardResult.disclaimer ? `${compiled}\n\n${guardResult.disclaimer}` : compiled;
+    // 4. Tambahkan label sumber jika pakai Google Search
+    const sourceLabel = searchSnippets
+      ? '\n\n---\n📡 *Jawaban didukung data pencarian web terkini.*'
+      : '\n\n---\n🤖 *Jawaban dari AI Kesehatan (model Gemini).*';
 
-    return NextResponse.json({ answer }, { status: 200 });
+    const disclaimer = guardResult.disclaimer
+      ? `\n\n⚠️ *${guardResult.disclaimer}*`
+      : '';
+
+    return NextResponse.json(
+      { answer: `${geminiAnswer}${sourceLabel}${disclaimer}` },
+      { status: 200 }
+    );
   } catch (e: any) {
-    console.error('Health query error:', e);
-    return NextResponse.json({ error: e.message || 'Internal server error' }, { status: 500 });
+    console.error('[health-query] Error:', e?.message || e);
+    return NextResponse.json(
+      { error: e?.message || 'Terjadi kesalahan pada server. Coba lagi.' },
+      { status: 500 }
+    );
   }
 }

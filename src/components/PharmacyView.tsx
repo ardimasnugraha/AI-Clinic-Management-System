@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Pill, Plus, Search, Package, AlertTriangle, CheckCircle2, Clock, TrendingDown, Check, Trash2 } from "lucide-react";
+import { Pill, Plus, Search, Package, AlertTriangle, CheckCircle2, Clock, Filter, Trash2 } from "lucide-react";
 import { logAuditEvent } from "@/lib/store";
 import { supabase } from "@/lib/supabase/client";
 
@@ -27,7 +27,66 @@ export interface InventoryItem {
   unit: string;
   price: number;
   color: string;
+  category?: string;
 }
+
+export const DEFAULT_INVENTORY: InventoryItem[] = [
+  // 1. POLI MATA (dr. Hendra Kusuma)
+  { id: "MED-MTA-001", name: "Cendo Xitrol Tetes Mata Steril (5ml)", stock: 70, min: 15, unit: "botol", price: 38000, color: "#3b82f6", category: "Poli Mata" },
+  { id: "MED-MTA-002", name: "Cendo Eyefresh / Insto Tetes Mata (15ml)", stock: 90, min: 20, unit: "botol", price: 18000, color: "#3b82f6", category: "Poli Mata" },
+  { id: "MED-MTA-003", name: "Cendo Tobroson Tetes Mata (5ml)", stock: 45, min: 10, unit: "botol", price: 52000, color: "#3b82f6", category: "Poli Mata" },
+  { id: "MED-MTA-004", name: "Cendo Lyteers Tetes Mata Kering (15ml)", stock: 60, min: 15, unit: "botol", price: 32000, color: "#3b82f6", category: "Poli Mata" },
+  { id: "MED-MTA-005", name: "Chloramphenicol Salep Mata Steril 3.5g", stock: 50, min: 12, unit: "tube", price: 15000, color: "#3b82f6", category: "Poli Mata" },
+  { id: "MED-MTA-006", name: "Cendo Statrol Tetes Mata Steril (5ml)", stock: 40, min: 10, unit: "botol", price: 42000, color: "#3b82f6", category: "Poli Mata" },
+
+  // 2. POLI PENYAKIT DALAM (dr. Bagus W.)
+  { id: "MED-PDL-001", name: "Metformin 500mg", stock: 240, min: 50, unit: "tablet", price: 1800, color: "#0284c7", category: "Poli Penyakit Dalam" },
+  { id: "MED-PDL-002", name: "Glimepiride 2mg", stock: 130, min: 30, unit: "tablet", price: 3200, color: "#0284c7", category: "Poli Penyakit Dalam" },
+  { id: "MED-PDL-003", name: "Lansoprazole 30mg", stock: 110, min: 25, unit: "kapsul", price: 4500, color: "#0284c7", category: "Poli Penyakit Dalam" },
+  { id: "MED-PDL-004", name: "Sukralfat Sirup Maag 500mg/5ml (100ml)", stock: 50, min: 15, unit: "botol", price: 38000, color: "#0284c7", category: "Poli Penyakit Dalam" },
+  { id: "MED-PDL-005", name: "Allopurinol 100mg (Asam Urat)", stock: 170, min: 35, unit: "tablet", price: 2000, color: "#0284c7", category: "Poli Penyakit Dalam" },
+  { id: "MED-PDL-006", name: "Domperidone 10mg (Anti Mual)", stock: 160, min: 30, unit: "tablet", price: 2200, color: "#0284c7", category: "Poli Penyakit Dalam" },
+
+  // 3. POLI UMUM (dr. Maya Lestari)
+  { id: "MED-UMM-001", name: "Paracetamol 500mg", stock: 250, min: 50, unit: "tablet", price: 1500, color: "#0d9488", category: "Poli Umum" },
+  { id: "MED-UMM-002", name: "Amoxicillin 500mg", stock: 180, min: 40, unit: "kaplet", price: 2500, color: "#0d9488", category: "Poli Umum" },
+  { id: "MED-UMM-003", name: "Ibuprofen 400mg", stock: 150, min: 30, unit: "tablet", price: 2000, color: "#0d9488", category: "Poli Umum" },
+  { id: "MED-UMM-004", name: "Cetirizine 10mg", stock: 200, min: 30, unit: "tablet", price: 1800, color: "#0d9488", category: "Poli Umum" },
+  { id: "MED-UMM-005", name: "Omeprazole 20mg", stock: 120, min: 25, unit: "kapsul", price: 3500, color: "#0d9488", category: "Poli Umum" },
+  { id: "MED-UMM-006", name: "Vitamin C 500mg", stock: 300, min: 50, unit: "tablet", price: 1000, color: "#0d9488", category: "Poli Umum" },
+
+  // 4. POLI GIGI (drg. Sari Dewi)
+  { id: "MED-GGI-001", name: "Cataflam 50mg (Potassium Diclofenac)", stock: 100, min: 20, unit: "tablet", price: 7500, color: "#8b5cf6", category: "Poli Gigi" },
+  { id: "MED-GGI-002", name: "Asam Mafenamat 500mg", stock: 160, min: 30, unit: "kaplet", price: 2000, color: "#8b5cf6", category: "Poli Gigi" },
+  { id: "MED-GGI-003", name: "Ciprofloxacin 500mg", stock: 90, min: 20, unit: "kaplet", price: 4000, color: "#8b5cf6", category: "Poli Gigi" },
+  { id: "MED-GGI-004", name: "Minosep Antiseptic Mouthwash 150ml", stock: 45, min: 10, unit: "botol", price: 35000, color: "#8b5cf6", category: "Poli Gigi" },
+  { id: "MED-GGI-005", name: "Aloclair Plus Gel Sariawan 8ml", stock: 30, min: 8, unit: "tube", price: 85000, color: "#8b5cf6", category: "Poli Gigi" },
+  { id: "MED-GGI-006", name: "Clindamycin 300mg", stock: 80, min: 15, unit: "kapsul", price: 5000, color: "#8b5cf6", category: "Poli Gigi" },
+
+  // 5. POLI JANTUNG (dr. Ahmad Rizki)
+  { id: "MED-JTG-001", name: "Amlodipine 10mg", stock: 220, min: 40, unit: "tablet", price: 3000, color: "#f97316", category: "Poli Jantung" },
+  { id: "MED-JTG-002", name: "Captopril 25mg", stock: 150, min: 30, unit: "tablet", price: 1500, color: "#f97316", category: "Poli Jantung" },
+  { id: "MED-JTG-003", name: "Bisoprolol 5mg", stock: 130, min: 25, unit: "tablet", price: 4500, color: "#f97316", category: "Poli Jantung" },
+  { id: "MED-JTG-004", name: "Simvastatin 20mg", stock: 140, min: 30, unit: "tablet", price: 3000, color: "#f97316", category: "Poli Jantung" },
+  { id: "MED-JTG-005", name: "Clopidogrel 75mg", stock: 85, min: 20, unit: "tablet", price: 12000, color: "#f97316", category: "Poli Jantung" },
+  { id: "MED-JTG-006", name: "ISDN (Isosorbide Dinitrate) 5mg", stock: 95, min: 20, unit: "tablet", price: 2000, color: "#f97316", category: "Poli Jantung" },
+
+  // 6. POLI KULIT (dr. Laila Rahmawati)
+  { id: "MED-KLT-001", name: "Hydrocortisone Cream 1% (5g)", stock: 60, min: 15, unit: "tube", price: 12000, color: "#ec4899", category: "Poli Kulit" },
+  { id: "MED-KLT-002", name: "Ketoconazole 200mg", stock: 110, min: 25, unit: "tablet", price: 3500, color: "#ec4899", category: "Poli Kulit" },
+  { id: "MED-KLT-003", name: "Calamine Lotion 100ml", stock: 40, min: 10, unit: "botol", price: 25000, color: "#ec4899", category: "Poli Kulit" },
+  { id: "MED-KLT-004", name: "Salep 2-4 Anti Gatal & Jamur", stock: 75, min: 20, unit: "pot", price: 8000, color: "#ec4899", category: "Poli Kulit" },
+  { id: "MED-KLT-005", name: "Dexamethasone 0.5mg", stock: 190, min: 40, unit: "tablet", price: 1200, color: "#ec4899", category: "Poli Kulit" },
+  { id: "MED-KLT-006", name: "Desolex Cream (Desonide 10g)", stock: 35, min: 10, unit: "tube", price: 45000, color: "#ec4899", category: "Poli Kulit" },
+
+  // 7. POLI ANAK (dr. Rudi Setiawan)
+  { id: "MED-ANK-001", name: "Sanmol Sirup Anak 120mg/5ml (60ml)", stock: 80, min: 20, unit: "botol", price: 18000, color: "#22c55e", category: "Poli Anak" },
+  { id: "MED-ANK-002", name: "Tempra Drops Paracetamol Bayi (15ml)", stock: 50, min: 12, unit: "botol", price: 48000, color: "#22c55e", category: "Poli Anak" },
+  { id: "MED-ANK-003", name: "Zinc Sirup Diare 20mg/5ml (60ml)", stock: 65, min: 15, unit: "botol", price: 22000, color: "#22c55e", category: "Poli Anak" },
+  { id: "MED-ANK-004", name: "Oralit Garam Rehidrasi", stock: 300, min: 50, unit: "sachet", price: 1500, color: "#22c55e", category: "Poli Anak" },
+  { id: "MED-ANK-005", name: "Rhinos Neo Drops Flu Anak (10ml)", stock: 40, min: 10, unit: "botol", price: 65000, color: "#22c55e", category: "Poli Anak" },
+  { id: "MED-ANK-006", name: "Amoxsan Sirup Kering 125mg/5ml", stock: 55, min: 15, unit: "botol", price: 32000, color: "#22c55e", category: "Poli Anak" }
+];
 
 export default function PharmacyView() {
   const [tab, setTab] = useState<"resep" | "stok">("resep");
@@ -35,16 +94,20 @@ export default function PharmacyView() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
+  // Filters State for Inventory
+  const [filterPoli, setFilterPoli] = useState<string>("Semua Poli");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+
   // Add Item Modal
   const [showAddStockModal, setShowAddStockModal] = useState(false);
-  const [stockForm, setStockForm] = useState({ name: "", stock: 100, min: 30, unit: "tablet", price: 1500 });
+  const [stockForm, setStockForm] = useState({ name: "", stock: 100, min: 30, unit: "tablet", price: 1500, category: "Poli Umum" });
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3500);
   };
 
-  // Fetch Inventory and Pharmacy Orders from Supabase
+  // Fetch Inventory and Pharmacy Orders from Supabase / Fallback Cache
   const loadPharmacyData = async () => {
     // 1. Fetch Inventory
     try {
@@ -53,7 +116,7 @@ export default function PharmacyView() {
         .select("*")
         .order("name", { ascending: true });
 
-      if (!invErr && invData) {
+      if (!invErr && invData && invData.length > 0) {
         const mappedInv: InventoryItem[] = invData.map((item: any) => ({
           id: item.item_code || item.id,
           name: item.name,
@@ -61,16 +124,34 @@ export default function PharmacyView() {
           min: item.min_stock,
           unit: item.unit,
           price: Number(item.price),
-          color: item.color || "#0d9488"
+          color: item.color || "#0d9488",
+          category: item.category || "Poli Umum"
         }));
         setInventory(mappedInv);
         localStorage.setItem("clinic_inventory_v1", JSON.stringify(mappedInv));
       } else {
         const cachedInv = localStorage.getItem("clinic_inventory_v1");
-        if (cachedInv) setInventory(JSON.parse(cachedInv));
+        if (cachedInv) {
+          try {
+            const parsed = JSON.parse(cachedInv);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setInventory(parsed);
+            } else {
+              setInventory(DEFAULT_INVENTORY);
+              localStorage.setItem("clinic_inventory_v1", JSON.stringify(DEFAULT_INVENTORY));
+            }
+          } catch (e) {
+            setInventory(DEFAULT_INVENTORY);
+            localStorage.setItem("clinic_inventory_v1", JSON.stringify(DEFAULT_INVENTORY));
+          }
+        } else {
+          setInventory(DEFAULT_INVENTORY);
+          localStorage.setItem("clinic_inventory_v1", JSON.stringify(DEFAULT_INVENTORY));
+        }
       }
     } catch (e) {
       console.warn("Error loading pharmacy inventory from Supabase", e);
+      setInventory(DEFAULT_INVENTORY);
     }
 
     // 2. Fetch Orders
@@ -132,7 +213,8 @@ export default function PharmacyView() {
       min: Number(stockForm.min),
       unit: stockForm.unit,
       price: Number(stockForm.price),
-      color: "#0d9488"
+      color: stockForm.category === "Poli Mata" ? "#3b82f6" : stockForm.category === "Poli Penyakit Dalam" ? "#0284c7" : stockForm.category === "Poli Gigi" ? "#8b5cf6" : stockForm.category === "Poli Jantung" ? "#f97316" : stockForm.category === "Poli Kulit" ? "#ec4899" : stockForm.category === "Poli Anak" ? "#22c55e" : "#0d9488",
+      category: stockForm.category
     };
 
     // Push to Supabase
@@ -145,7 +227,8 @@ export default function PharmacyView() {
         min_stock: Number(stockForm.min),
         unit: stockForm.unit,
         price: Number(stockForm.price),
-        color: "#0d9488"
+        color: newItem.color,
+        category: stockForm.category
       }]);
     } catch (e) {
       console.warn("Failed saving stock item to Supabase", e);
@@ -158,9 +241,15 @@ export default function PharmacyView() {
     } catch (e) {}
 
     setShowAddStockModal(false);
-    showToast(`Obat Baru ${stockForm.name} berhasil ditambahkan ke inventaris!`);
+    showToast(`Obat Baru ${stockForm.name} (${stockForm.category}) berhasil ditambahkan!`);
     logAuditEvent("Tambah Inventaris Obat", "Farmasi", `Menambahkan obat ${stockForm.name} stok ${stockForm.stock} ${stockForm.unit}`);
   };
+
+  const filteredInventory = inventory.filter(item => {
+    const matchCategory = filterPoli === "Semua Poli" || (item.category || "Poli Umum").toLowerCase().includes(filterPoli.toLowerCase().replace("poli ", ""));
+    const matchSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || item.id.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchCategory && matchSearch;
+  });
 
   const readyCount = orders.filter(o => o.status === "Siap Diambil").length;
   const pendingCount = orders.filter(o => o.status === "Menunggu Penyiapan" || o.status === "Racikan Berjalan").length;
@@ -181,22 +270,27 @@ export default function PharmacyView() {
         </div>
       )}
 
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      {/* Header Bar */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#0f172a", margin: 0 }}>Modul Farmasi & Apotek</h1>
-          <p style={{ fontSize: 13, color: "#64748b", margin: "2px 0 0" }}>Kelola pemenuhan resep dokter, inventaris stok obat, dan penyerahan obat</p>
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: "#0f172a", margin: 0 }}>Farmasi & Apotek Klinik</h2>
+          <p style={{ fontSize: 13, color: "#64748b", margin: "2px 0 0" }}>Kelola antrean resep obat pasien dan inventaris obat seluruh poli spesialis</p>
         </div>
 
         <button 
-          onClick={() => setShowAddStockModal(true)}
-          style={{ display: "flex", alignItems: "center", gap: 8, background: "#0d9488", color: "#fff", border: "none", borderRadius: 12, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 12px rgba(13,148,136,0.25)" }}>
-          <Plus style={{ width: 16, height: 16 }} /> Tambah Inventaris Obat
+          onClick={() => setShowAddStockModal(true)} 
+          style={{ 
+            display: "flex", alignItems: "center", gap: 8, padding: "10px 18px", 
+            borderRadius: 12, border: "none", background: "#0d9488", color: "#fff", 
+            fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 12px rgba(13,148,136,0.25)" 
+          }}>
+          <Plus style={{ width: 16, height: 16 }} />
+          <span>Tambah Inventaris Obat</span>
         </button>
       </div>
 
-      {/* Stat Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
+      {/* Stats Summary */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
         {[
           { label: "Total Resep Masuk", val: orders.length, color: "#0d9488", bg: "#e0f2fe", icon: Pill },
           { label: "Siap Diambil", val: readyCount, color: "#22c55e", bg: "#f0fdf4", icon: CheckCircle2 },
@@ -218,19 +312,52 @@ export default function PharmacyView() {
         })}
       </div>
 
-      {/* View Toggle */}
-      <div style={{ display: "flex", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden", width: "fit-content" }}>
-        {(["resep", "stok"] as const).map(t => (
-          <button 
-            key={t} 
-            onClick={() => setTab(t)} 
-            style={{ 
-              padding: "9px 24px", fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer", 
-              background: tab === t ? "#0d9488" : "#fff", color: tab === t ? "#fff" : "#64748b" 
-            }}>
-            {t === "resep" ? "📋 Daftar Resep Masuk" : "📦 Stok & Inventaris Obat"}
-          </button>
-        ))}
+      {/* View Toggle & Filters */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+        <div style={{ display: "flex", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden", width: "fit-content" }}>
+          {(["resep", "stok"] as const).map(t => (
+            <button 
+              key={t} 
+              onClick={() => setTab(t)} 
+              style={{ 
+                padding: "9px 24px", fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer", 
+                background: tab === t ? "#0d9488" : "#fff", color: tab === t ? "#fff" : "#64748b" 
+              }}>
+              {t === "resep" ? "📋 Daftar Resep Masuk" : `📦 Stok & Inventaris Obat (${inventory.length})`}
+            </button>
+          ))}
+        </div>
+
+        {tab === "stok" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            {/* Filter Poli */}
+            <select 
+              value={filterPoli} 
+              onChange={e => setFilterPoli(e.target.value)} 
+              style={{ padding: "8px 12px", borderRadius: 10, border: "1.5px solid #cbd5e1", fontSize: 12.5, fontWeight: 700, color: "#0d9488", background: "#fff", cursor: "pointer", outline: "none" }}>
+              <option value="Semua Poli">Semua Poli / Spesialis</option>
+              <option value="Poli Mata">Poli Mata (dr. Hendra Kusuma)</option>
+              <option value="Poli Penyakit Dalam">Poli Penyakit Dalam (dr. Bagus W.)</option>
+              <option value="Poli Gigi">Poli Gigi (drg. Sari Dewi)</option>
+              <option value="Poli Jantung">Poli Jantung (dr. Ahmad Rizki)</option>
+              <option value="Poli Kulit">Poli Kulit (dr. Laila Rahmawati)</option>
+              <option value="Poli Anak">Poli Anak (dr. Rudi Setiawan)</option>
+              <option value="Poli Umum">Poli Umum (dr. Maya Lestari)</option>
+            </select>
+
+            {/* Search Input */}
+            <div style={{ position: "relative" }}>
+              <Search style={{ width: 14, height: 14, color: "#94a3b8", position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
+              <input 
+                type="text" 
+                placeholder="Cari nama/kode obat..." 
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{ padding: "8px 12px 8px 30px", borderRadius: 10, border: "1.5px solid #cbd5e1", fontSize: 12, outline: "none", width: 180 }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -310,23 +437,33 @@ export default function PharmacyView() {
             <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 13 }}>
               <thead>
                 <tr style={{ background: "#f8fafc" }}>
-                  {["Kode Obat", "Nama Obat", "Stok Tersedia", "Stok Minimum", "Satuan", "Harga / Satuan", "Status Stok"].map(h => (
+                  {["Kode Obat", "Nama Obat", "Spesialis / Poli", "Stok Tersedia", "Stok Minimum", "Satuan", "Harga / Satuan", "Status Stok"].map(h => (
                     <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#64748b", borderBottom: "1px solid #e8f0fe" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {inventory.length === 0 ? (
+                {filteredInventory.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: "center", padding: 36, color: "#94a3b8" }}>
-                      Inventaris obat kosong. Klik tombol "Tambah Inventaris Obat" untuk menambahkan data obat baru.
+                    <td colSpan={8} style={{ textAlign: "center", padding: 36, color: "#94a3b8" }}>
+                      Tidak ditemukan data obat untuk filter ini. Klik tombol "Tambah Inventaris Obat" untuk menambahkan data baru.
                     </td>
                   </tr>
                 ) : (
-                  inventory.map((item) => (
+                  filteredInventory.map((item) => (
                     <tr key={item.id} style={{ borderBottom: "1px solid #f8fafc" }}>
                       <td style={{ padding: "12px 16px", color: "#0d9488", fontWeight: 800 }}>{item.id}</td>
                       <td style={{ padding: "12px 16px", fontWeight: 700, color: "#0f172a" }}>{item.name}</td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <span style={{ 
+                          background: (item.color || "#0d9488") + "18", 
+                          color: item.color || "#0d9488", 
+                          border: `1px solid ${(item.color || "#0d9488")}35`, 
+                          borderRadius: 8, padding: "3px 8px", fontSize: 11, fontWeight: 800 
+                        }}>
+                          {item.category || "Poli Umum"}
+                        </span>
+                      </td>
                       <td style={{ padding: "12px 16px", fontWeight: 800, color: item.stock < item.min ? "#ef4444" : "#0f172a" }}>{item.stock}</td>
                       <td style={{ padding: "12px 16px", color: "#64748b" }}>{item.min}</td>
                       <td style={{ padding: "12px 16px", color: "#475569" }}>{item.unit}</td>
@@ -357,11 +494,27 @@ export default function PharmacyView() {
             
             <form onSubmit={handleAddStockSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>Poli / Spesialis Dokter *</label>
+                <select 
+                  value={stockForm.category} 
+                  onChange={e => setStockForm({ ...stockForm, category: e.target.value })}
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: 13, background: "#fff", fontWeight: 700, color: "#0d9488" }}>
+                  <option value="Poli Umum">Poli Umum (dr. Maya Lestari)</option>
+                  <option value="Poli Gigi">Poli Gigi (drg. Sari Dewi)</option>
+                  <option value="Poli Jantung">Poli Jantung (dr. Ahmad Rizki)</option>
+                  <option value="Poli Kulit">Poli Kulit (dr. Laila Rahmawati)</option>
+                  <option value="Poli Anak">Poli Anak (dr. Rudi Setiawan)</option>
+                  <option value="Poli Mata">Poli Mata (dr. Hendra Kusuma)</option>
+                  <option value="Poli Penyakit Dalam">Poli Penyakit Dalam (dr. Bagus W.)</option>
+                </select>
+              </div>
+
+              <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>Nama Obat & Dosis *</label>
                 <input 
                   type="text" 
                   required
-                  placeholder="Contoh: Paracetamol 500mg"
+                  placeholder="Contoh: Cendo Xitrol Tetes Mata 5ml"
                   value={stockForm.name} 
                   onChange={e => setStockForm({ ...stockForm, name: e.target.value })}
                   style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: 13 }} 
@@ -405,7 +558,9 @@ export default function PharmacyView() {
                     <option value="botol">botol</option>
                     <option value="ampul">ampul</option>
                     <option value="tube">tube</option>
-                    <option value="strip">strip</option>
+                    <option value="sachet">sachet</option>
+                    <option value="kaplet">kaplet</option>
+                    <option value="pot">pot</option>
                   </select>
                 </div>
 

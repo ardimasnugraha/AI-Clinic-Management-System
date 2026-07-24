@@ -1003,11 +1003,6 @@ const fetchPatientInfo = async (rm: string) => {
             <p style={{ fontSize: 11.5, color: "rgba(255,255,255,0.85)", lineHeight: 1.6, margin: "0 0 12px" }}>
               Saran AI: Pasien memiliki riwayat Hipertensi. Pertimbangkan pemeriksaan tekanan darah berkala dan penyesuaian dosis Amlodipine.
             </p>
-            <button 
-              onClick={() => showToast("SOAP Otomatis diisi oleh AI Assistant!")}
-              style={{ width: "100%", padding: "8.5px 0", background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.35)", borderRadius: 10, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-              Isi SOAP Otomatis dari AI
-            </button>
           </div>
 
           <Container style={{ padding: 16 }}>

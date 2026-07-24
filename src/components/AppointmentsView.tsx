@@ -59,16 +59,46 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
   const [appointments, setAppointments] = useState<AppointmentItem[]>(DEFAULT_APPOINTMENTS);
   const [doctorsList, setDoctorsList] = useState<any[]>([]);
 
-  // Real-time Week Date Range Calculation
-  const now = new Date();
-  const currentDayOfWeek = (now.getDay() + 6) % 7; // Monday = 0
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - currentDayOfWeek);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
+  // Real-time Week State (weekOffset = 0 means current week, -1 previous week, +1 next week)
+  const [weekOffset, setWeekOffset] = useState<number>(0);
 
-  const MONTH_NAMES_ID = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-  const weekRangeStr = `${monday.getDate()} - ${sunday.getDate()} ${MONTH_NAMES_ID[sunday.getMonth()]} ${sunday.getFullYear()}`;
+  // Real-time auto-update for current date
+  const [now, setNow] = useState<Date>(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const current = new Date();
+      if (current.getDate() !== now.getDate() || current.getMonth() !== now.getMonth()) {
+        setNow(current);
+      }
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [now]);
+
+  const MONTH_NAMES_ID = useMemo(() => [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni", 
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+  ], []);
+
+  // Monday of the week being viewed
+  const mondayOfView = useMemo(() => {
+    const d = new Date(now);
+    const dayOfWeek = (d.getDay() + 6) % 7; // Monday = 0
+    d.setDate(d.getDate() - dayOfWeek + (weekOffset * 7));
+    return d;
+  }, [now, weekOffset]);
+
+  // Sunday of the week being viewed
+  const sundayOfView = useMemo(() => {
+    const d = new Date(mondayOfView);
+    d.setDate(mondayOfView.getDate() + 6);
+    return d;
+  }, [mondayOfView]);
+
+  const weekRangeStr = useMemo(() => {
+    const sStr = `${sundayOfView.getDate()} ${MONTH_NAMES_ID[sundayOfView.getMonth()]} ${sundayOfView.getFullYear()}`;
+    return `${mondayOfView.getDate()} - ${sStr}`;
+  }, [mondayOfView, sundayOfView, MONTH_NAMES_ID]);
   const [queueList, setQueueList] = useState<any[]>([]);
   const [registeredPatients, setRegisteredPatients] = useState<Array<{ rm: string; name: string; phone?: string }>>([]);
   const [isManualPatientInput, setIsManualPatientInput] = useState(false);
@@ -365,9 +395,37 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
     showToast(`✅ ${apt.patientName || "Pasien"} berhasil Check-in & masuk ke antrean ${apt.poli}!`);
   };
 
+  const DAYS_HEADER = useMemo(() => {
+    const dayNames = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
+    const today = new Date();
+
+    return dayNames.map((dayName, idx) => {
+      const d = new Date(mondayOfView);
+      d.setDate(mondayOfView.getDate() + idx);
+
+      const isToday = 
+        today.getDate() === d.getDate() && 
+        today.getMonth() === d.getMonth() && 
+        today.getFullYear() === d.getFullYear();
+
+      const monthNameShort = MONTH_NAMES_ID[d.getMonth()].slice(0, 3);
+
+      return {
+        day: dayName,
+        date: `${d.getDate()} ${monthNameShort}`,
+        fullDateStr: d.toISOString().split("T")[0],
+        idx,
+        isActive: isToday
+      };
+    });
+  }, [mondayOfView, MONTH_NAMES_ID]);
+
+  const dateMap = useMemo(() => {
+    return DAYS_HEADER.map(dh => dh.fullDateStr);
+  }, [DAYS_HEADER]);
+
   // Open empty slot modal
   const handleSlotClick = (dayIdx: number, slotTime: string) => {
-    const dateMap = ["2025-05-19", "2025-05-20", "2025-05-21", "2025-05-22", "2025-05-23", "2025-05-24", "2025-05-25"];
     setNewAppt(prev => ({
       ...prev,
       date: dateMap[dayIdx] || prev.date,
@@ -386,16 +444,6 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
       default: return { bg: "#f1f5f9", border: "#e2e8f0", text: "#475569" };
     }
   };
-
-  const DAYS_HEADER = [
-    { day: "Sen", date: "19 Mei", idx: 0 },
-    { day: "Sel", date: "20 Mei", idx: 1 },
-    { day: "Rab", date: "21 Mei", idx: 2, isActive: true },
-    { day: "Kam", date: "22 Mei", idx: 3 },
-    { day: "Jum", date: "23 Mei", idx: 4 },
-    { day: "Sab", date: "24 Mei", idx: 5 },
-    { day: "Min", date: "25 Mei", idx: 6 }
-  ];
 
   // Dynamic Doctor Slot Occupancy computed directly from Appointments & Queue Tickets (100% Real DB Sync)
   const doctorStats = useMemo(() => {
@@ -836,9 +884,9 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <h3 style={{ fontSize: 15, fontWeight: 900, color: "#0f172a", margin: 0 }}>Kalender Jadwal Mingguan</h3>
               <div style={{ display: "flex", gap: 4 }}>
-                <button style={{ border: "1px solid #e2e8f0", background: "#fff", borderRadius: 6, padding: "2px 6px", cursor: "pointer" }}><ChevronLeft style={{ width: 14, height: 14, color: "#64748b" }} /></button>
-                <button style={{ border: "1px solid #e2e8f0", background: "#fff", borderRadius: 6, padding: "2px 6px", cursor: "pointer" }}><ChevronRight style={{ width: 14, height: 14, color: "#64748b" }} /></button>
-                <button style={{ border: "1px solid #e2e8f0", background: "#f8fafc", borderRadius: 6, padding: "2px 8px", fontSize: 10.5, fontWeight: 700, cursor: "pointer", color: "#334155" }}>Hari Ini</button>
+                <button type="button" onClick={() => setWeekOffset(prev => prev - 1)} title="Minggu Sebelumnya" style={{ border: "1px solid #e2e8f0", background: "#fff", borderRadius: 6, padding: "2px 6px", cursor: "pointer" }}><ChevronLeft style={{ width: 14, height: 14, color: "#64748b" }} /></button>
+                <button type="button" onClick={() => setWeekOffset(prev => prev + 1)} title="Minggu Berikutnya" style={{ border: "1px solid #e2e8f0", background: "#fff", borderRadius: 6, padding: "2px 6px", cursor: "pointer" }}><ChevronRight style={{ width: 14, height: 14, color: "#64748b" }} /></button>
+                <button type="button" onClick={() => setWeekOffset(0)} title="Kembali ke Hari Ini" style={{ border: "1px solid #e2e8f0", background: weekOffset === 0 ? "#ccfbf1" : "#f8fafc", borderColor: weekOffset === 0 ? "#0d9488" : "#e2e8f0", borderRadius: 6, padding: "2px 8px", fontSize: 10.5, fontWeight: 800, cursor: "pointer", color: weekOffset === 0 ? "#0f766e" : "#334155" }}>Hari Ini</button>
               </div>
             </div>
 

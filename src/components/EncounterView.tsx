@@ -108,6 +108,7 @@ const fetchPatientInfo = async (rm: string) => {
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
 
   // Diagnosis & Tindakan State
+  const [diagnoses, setDiagnoses] = useState<Array<{ code: string; name: string }>>([]);
   const [icdCodeInput, setIcdCodeInput] = useState("");
   const [icdNameInput, setIcdNameInput] = useState("");
   const [procedures, setProcedures] = useState<Array<{ name: string; cost: number }>>([]);
@@ -283,16 +284,31 @@ const fetchPatientInfo = async (rm: string) => {
     setProcedures(procedures.filter((_, i) => i !== idx));
   };
 
+  const updateSoapAssessment = (diagList: Array<{ code: string; name: string }>) => {
+    const formattedA = diagList.map(d => `${d.name} (ICD-10: ${d.code})`).join(" / ");
+    setSoap(prev => ({ ...prev, A: formattedA }));
+  };
+
   const handleAddDiagnosis = (code: string, name: string) => {
-    const fullDiag = `${name} (ICD-10: ${code})`;
-    setSoap(prev => {
-      const existingA = prev.A.trim();
-      const updatedA = existingA ? `${existingA} / ${fullDiag}` : fullDiag;
-      return { ...prev, A: updatedA };
-    });
+    if (!code.trim() || !name.trim()) return;
+    
+    if (diagnoses.some(d => d.code.toLowerCase() === code.trim().toLowerCase())) {
+      showToast(`Diagnosis [${code}] sudah ada dalam daftar.`);
+      return;
+    }
+
+    const updated = [...diagnoses, { code: code.trim(), name: name.trim() }];
+    setDiagnoses(updated);
+    updateSoapAssessment(updated);
     setIcdCodeInput("");
     setIcdNameInput("");
-    showToast(`Diagnosis "${fullDiag}" ditambahkan ke Assessment (A)!`);
+    showToast(`Diagnosis [${code}] ${name} ditambahkan!`);
+  };
+
+  const handleRemoveDiagnosis = (idx: number) => {
+    const updated = diagnoses.filter((_, i) => i !== idx);
+    setDiagnoses(updated);
+    updateSoapAssessment(updated);
   };
 
   const handleSendLabOrder = async () => {
@@ -300,14 +316,20 @@ const fetchPatientInfo = async (rm: string) => {
       alert("Harap pilih Pasien terlebih dahulu.");
       return;
     }
-    const labNo = `LAB-${Math.floor(1000 + Math.random() * 9000)}`;
+    const labNo = `LAB${Math.floor(100 + Math.random() * 900)}`;
     const newOrder = {
+      id: labNo,
       clinic_id: "11111111-1111-1111-1111-111111111111",
       lab_no: labNo,
+      labNo: labNo,
       patient_rm: activePatient.rm,
+      patientRm: activePatient.rm,
       patient_name: activePatient.name,
+      patientName: activePatient.name,
       doctor_name: activePatient.doctor,
+      doctorName: activePatient.doctor,
       test_name: labTestName,
+      testName: labTestName,
       date: new Date().toISOString().split("T")[0],
       status: "menunggu",
       notes: labNotes || "Order dari Encounter Dokter",
@@ -319,14 +341,18 @@ const fetchPatientInfo = async (rm: string) => {
     } catch (e) {}
 
     try {
-      const cached = localStorage.getItem("clinic_lab_orders_v1");
-      const list = cached ? JSON.parse(cached) : [];
-      localStorage.setItem("clinic_lab_orders_v1", JSON.stringify([newOrder, ...list]));
+      const cached1 = localStorage.getItem("clinic_lab_v1");
+      const list1 = cached1 ? JSON.parse(cached1) : [];
+      localStorage.setItem("clinic_lab_v1", JSON.stringify([newOrder, ...list1]));
+
+      const cached2 = localStorage.getItem("clinic_lab_orders_v1");
+      const list2 = cached2 ? JSON.parse(cached2) : [];
+      localStorage.setItem("clinic_lab_orders_v1", JSON.stringify([newOrder, ...list2]));
     } catch (e) {}
 
     setPatientLabOrders(prev => [newOrder, ...prev]);
     setLabNotes("");
-    showToast(`Order Lab "${labTestName}" berhasil dikirim ke modul Laboratorium!`);
+    showToast(`Order Lab "${labTestName}" (${labNo}) berhasil dikirim ke modul Laboratorium!`);
   };
 
   const handleSelectPatientAny = async (rmOrName: string) => {
@@ -379,6 +405,11 @@ const fetchPatientInfo = async (rm: string) => {
 
   const applySoapTemplate = (type: "gigi" | "jantung" | "kulit" | "demam" | "mata" | "penyakit-dalam" | "anak" | "umum") => {
     if (type === "gigi") {
+      setDiagnoses([{ code: "K04.0", name: "Pulpitis Akut / Karies Gigi" }]);
+      setProcedures([
+        { name: "Konsultasi & Pemeriksaan Dokter Gigi", cost: 50000 },
+        { name: "Penambalan Gigi / Perawatan Periapikal", cost: 150000 }
+      ]);
       setSoap({
         S: "Pasien mengeluh sakit gigi geraham bawah kanan berdenyut sejak 2 hari, bertambah ngilu saat minum dingin dan makan.",
         O: "Pemeriksaan intraoral: Karies dentis profunda pada gigi 46, percusi (+), palpasi (-). Gusi sekitar hyperemia ringan.",
@@ -392,6 +423,11 @@ const fetchPatientInfo = async (rm: string) => {
       ]);
       showToast("Template SOAP Poli Gigi (drg. Sari Dewi) diterapkan!");
     } else if (type === "jantung") {
+      setDiagnoses([{ code: "I20.0", name: "Angina Pektoris Unstable / Suspect PJK" }]);
+      setProcedures([
+        { name: "Konsultasi Spesialis Jantung", cost: 75000 },
+        { name: "Rekam Jantung EKG 12-Lead", cost: 100000 }
+      ]);
       setSoap({
         S: "Pasien mengeluh dada kiri terasa berat seperti ditindih sejak tadi pagi, menjalar ke punggung, disertai sesak napas dan keringat dingin.",
         O: "TD: 150/90 mmHg, Nadi: 96 x/menit, Suhu: 36.5°C, RR: 22 x/menit, SpO2: 97%. Auskultasi Jantung: BJ I-II reguler, gallop (-), murmur (-).",
@@ -406,6 +442,8 @@ const fetchPatientInfo = async (rm: string) => {
       ]);
       showToast("Template SOAP Poli Jantung (dr. Ahmad Rizki) diterapkan!");
     } else if (type === "kulit") {
+      setDiagnoses([{ code: "L23.9", name: "Dermatitis Kontak Alergi" }]);
+      setProcedures([{ name: "Konsultasi Spesialis Kulit", cost: 65000 }]);
       setSoap({
         S: "Pasien mengeluh gatal-gatal dan kemerahan pada lengan dan leher sejak 3 hari, terasa panas dan gatal bertambah saat berkeringat.",
         O: "Status Dermatologis: Tampak plak eritematosa dengan papul dan ekskoriasi pada regio brachii dan colli. Tanda infeksi sekunder (-).",
@@ -419,6 +457,11 @@ const fetchPatientInfo = async (rm: string) => {
       ]);
       showToast("Template SOAP Poli Kulit (dr. Laila Rahmawati) diterapkan!");
     } else if (type === "demam") {
+      setDiagnoses([{ code: "A90", name: "Demam Dengue (Dengue Fever)" }]);
+      setProcedures([
+        { name: "Konsultasi Dokter Umum", cost: 50000 },
+        { name: "Pemeriksaan Darah Stik", cost: 35000 }
+      ]);
       setSoap({
         S: "Pasien mengeluh demam tinggi mendadak sejak 3 hari, disertai sakit kepala, nyeri belakang mata, mual, dan pegal seluruh badan.",
         O: "TD: 110/70 mmHg, Nadi: 88 x/menit, Suhu: 38.8°C, RR: 20 x/menit, SpO2: 98%. Rumple Leede (-), konjungtiva hiperemis (-).",
@@ -432,6 +475,11 @@ const fetchPatientInfo = async (rm: string) => {
       ]);
       showToast("Template SOAP Demam diterapkan!");
     } else if (type === "mata") {
+      setDiagnoses([{ code: "H10.0", name: "Konjungtivitis Bakteri OD" }]);
+      setProcedures([
+        { name: "Konsultasi Spesialis Mata", cost: 65000 },
+        { name: "Irigasi & Pembersihan Mata Steril", cost: 55000 }
+      ]);
       setSoap({
         S: "Pasien mengeluh mata kanan merah, berair, perih, dan mengganjal sejak kemarin pagi. Kotoran mata lengket saat bangun tidur.",
         O: "Pemeriksaan Oftalmologis OD: Injeksi konjungtiva (+), sekret seromukopurulen (+), kornea jernih, refleks cahaya (+/+), visus 6/6.",
@@ -445,6 +493,14 @@ const fetchPatientInfo = async (rm: string) => {
       ]);
       showToast("Template SOAP Poli Mata (dr. Hendra Kusuma) diterapkan!");
     } else if (type === "penyakit-dalam") {
+      setDiagnoses([
+        { code: "K30", name: "Dispepsia Organik / GERD" },
+        { code: "E11.9", name: "Diabetes Mellitus Tipe 2" }
+      ]);
+      setProcedures([
+        { name: "Konsultasi Spesialis Penyakit Dalam", cost: 75000 },
+        { name: "Pemeriksaan Gula Darah & Kolesterol", cost: 35000 }
+      ]);
       setSoap({
         S: "Pasien mengeluh nyeri ulu hati terasa terbakar (heartburn), mual, perut kembung, dan badan lemas sejak 1 minggu. Riwayat Diabetes Mellitus Tipe 2 dan Asam Lambung.",
         O: "TD: 130/80 mmHg, Nadi: 82 x/menit, Suhu: 36.6°C, Gula Darah Puasa: 145 mg/dL. Nyeri tekan epigastrium (+), peristaltik usus normal.",
@@ -459,6 +515,11 @@ const fetchPatientInfo = async (rm: string) => {
       ]);
       showToast("Template SOAP Poli Penyakit Dalam (dr. Bagus W.) diterapkan!");
     } else if (type === "anak") {
+      setDiagnoses([{ code: "J06.9", name: "Infeksi Saluran Pernapasan Akut (ISPA) Anak" }]);
+      setProcedures([
+        { name: "Konsultasi Spesialis Anak", cost: 65000 },
+        { name: "Nebulizer / Terapi Uap Anak", cost: 60000 }
+      ]);
       setSoap({
         S: "Anak (umur 4 tahun) mengeluh batuk berdahak, pilek hidung tersumbat, dan demam naik turun sejak 2 hari. Nafsu makan menurun tetapi masih mau minum.",
         O: "BB: 15 kg, Suhu: 38.2°C, Nadi: 104 x/menit, RR: 24 x/menit. Pharynx hiperemis (+), tonsil T1-T1, auskultasi paru vesikuler (+/+), ronkhi (-), wheezing (-).",
@@ -473,6 +534,8 @@ const fetchPatientInfo = async (rm: string) => {
       ]);
       showToast("Template SOAP Poli Anak (dr. Rudi Setiawan) diterapkan!");
     } else if (type === "umum") {
+      setDiagnoses([{ code: "J00", name: "Common Cold / Influenza (Flu)" }]);
+      setProcedures([{ name: "Konsultasi & Pemeriksaan Dokter Umum", cost: 50000 }]);
       setSoap({
         S: "Pasien mengeluh badan pegal-pegal, pusing berputar ringan, batuk kering, dan tenggorokan gatal setelah terpapar hujan 2 hari lalu.",
         O: "TD: 120/80 mmHg, Nadi: 80 x/menit, Suhu: 37.2°C, RR: 18 x/menit, SpO2: 99%. Pharynx sedikit hiperemis, paru vesikuler (+/+).",
@@ -1001,6 +1064,39 @@ const fetchPatientInfo = async (rm: string) => {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Active Added Diagnoses List Card */}
+              <div style={{ marginBottom: 24 }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color: "#0f172a", display: "block", marginBottom: 10 }}>
+                  📋 Daftar Diagnosis Pasien Ditambahkan ({diagnoses.length}):
+                </span>
+                {diagnoses.length === 0 ? (
+                  <div style={{ padding: 16, textAlign: "center", background: "#f8fafc", borderRadius: 12, border: "1px dashed #cbd5e1" }}>
+                    <p style={{ fontSize: 12.5, color: "#64748b", margin: 0, fontWeight: 700 }}>
+                      Belum ada diagnosis dipilih. Klik katalog cepat di atas atau masukkan kode ICD-10 secara manual.
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                    {diagnoses.map((d, i) => (
+                      <div key={i} style={{ background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: 10, padding: "8px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+                        <div>
+                          <span style={{ fontSize: 11, fontWeight: 900, color: "#166534", background: "#dcfce7", padding: "2px 6px", borderRadius: 6, marginRight: 6 }}>
+                            {d.code}
+                          </span>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{d.name}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveDiagnosis(i)}
+                          style={{ border: "none", background: "#fef2f2", color: "#dc2626", borderRadius: 6, padding: "2px 6px", fontWeight: 800, cursor: "pointer", fontSize: 12 }}>
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Custom Input Diagnosis ICD-10 */}

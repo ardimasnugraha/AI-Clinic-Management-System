@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Sparkles, Send, Brain, Bot, User, Activity, AlertCircle, Calendar, Plus, MessageSquare, Key } from "lucide-react";
+import { Sparkles, Send, Bot, MessageSquare } from "lucide-react";
 
 interface Message {
   sender: "user" | "ai";
@@ -17,44 +17,7 @@ const PRESET_PROMPTS = [
   { text: "Buat draf pesan WhatsApp pengingat imunisasi anak", label: "Draf WA Imunisasi" }
 ];
 
-const CLINICAL_RECOMMENDATIONS = [
-  {
-    id: 1,
-    title: "Optimasi Alokasi Dokter Poli Umum",
-    category: "Operasional",
-    desc: "AI memproyeksikan lonjakan pasien di Poli Umum pada jam 10:00 - 12:00 berdasarkan riwayat kunjungan hari Kamis. Disarankan dr. Maya Lestari dialokasikan standby membantu pelayanan.",
-    icon: Activity,
-    color: "#8b5cf6",
-    bg: "#f3e8ff"
-  },
-  {
-    id: 2,
-    title: "Pencegahan Efek Samping & Interaksi Obat",
-    category: "Keselamatan",
-    desc: "AI mendeteksi potensi efek samping jika meresepkan Ciprofloxacin bersamaan dengan Antasida. Disarankan untuk menjeda konsumsi obat minimal 2 jam untuk efektivitas maksimal.",
-    icon: AlertCircle,
-    color: "#ef4444",
-    bg: "#fef2f2"
-  },
-  {
-    id: 3,
-    title: "Imunisasi Booster Anak Terlambat",
-    category: "Layanan Pasien",
-    desc: "AI mengidentifikasi terdapat 12 pasien anak yang terlewat jadwal imunisasi booster DPT. Direkomendasikan untuk mengirimkan draf pesan WhatsApp pengingat ke orang tua pasien.",
-    icon: Calendar,
-    color: "#0d9488",
-    bg: "#ecfdf5"
-  },
-  {
-    id: 4,
-    title: "Stok Kritis Paracetamol & Amoxicillin",
-    category: "Inventaris",
-    desc: "Berdasarkan tren peresepan 7 hari terakhir, stok Paracetamol 500mg dan Amoxicillin kering diproyeksikan habis dalam 4 hari ke depan. Disarankan segera ajukan pengadaan baru.",
-    icon: Brain,
-    color: "#f97316",
-    bg: "#fff7ed"
-  }
-];
+
 
 export default function AiAssistantView() {
   const [messages, setMessages] = useState<Message[]>([
@@ -360,16 +323,16 @@ export default function AiAssistantView() {
 
 
 
-      {/* Main Content Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 24, alignItems: "start" }}>
+      {/* Main Content Grid (Full Width Chatbot) */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 24, alignItems: "start" }}>
         
-        {/* Chatbot Column (Left) */}
+        {/* Chatbot Column */}
         <div style={{
           background: "#fff",
           borderRadius: 20,
           border: "1px solid #e2e8f0",
           boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
-          height: 600,
+          height: 620,
           display: "flex",
           flexDirection: "column",
           overflow: "hidden"
@@ -511,60 +474,6 @@ export default function AiAssistantView() {
             </button>
           </form>
         </div>
-
-        {/* AI Recommendations Column (Right) */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{
-            background: "#fff",
-            borderRadius: 20,
-            border: "1px solid #e2e8f0",
-            padding: 20,
-            boxShadow: "0 4px 20px rgba(0,0,0,0.03)"
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 10, background: "#faf5ff", display: "flex", alignItems: "center", justifyContent: "center", color: "#a855f7" }}>
-                <Brain style={{ width: 18, height: 18 }} />
-              </div>
-              <div>
-                <h3 style={{ fontSize: 15, fontWeight: 800, color: "#0f172a", margin: 0 }}>Rekomendasi Cerdas AI</h3>
-                <p style={{ fontSize: 11, color: "#64748b", margin: 0 }}>Rekomendasi pencegahan & operasional otomatis</p>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {CLINICAL_RECOMMENDATIONS.map((rec) => {
-                const Icon = rec.icon;
-                return (
-                  <div key={rec.id} style={{
-                    padding: 14,
-                    borderRadius: 14,
-                    background: "#f8fafc",
-                    border: "1px solid #e2e8f0",
-                    transition: "transform 0.2s",
-                    cursor: "pointer"
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-2px)"}
-                  onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 6 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ width: 26, height: 26, borderRadius: 6, background: rec.bg, display: "flex", alignItems: "center", justifyContent: "center", color: rec.color }}>
-                          <Icon style={{ width: 14, height: 14 }} />
-                        </div>
-                        <span style={{ fontSize: 12, fontWeight: 800, color: "#0f172a" }}>{rec.title}</span>
-                      </div>
-                      <span style={{ marginLeft: "auto", fontSize: 9.5, fontWeight: 800, color: rec.color, background: rec.bg, padding: "2px 8px", borderRadius: 10 }}>
-                        {rec.category}
-                      </span>
-                    </div>
-                    <p style={{ fontSize: 11.5, color: "#475569", margin: 0, lineHeight: 1.5 }}>{rec.desc}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
       </div>
     </div>
   );

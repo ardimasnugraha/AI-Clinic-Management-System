@@ -39,10 +39,24 @@ interface EncounterViewProps {
 }
 
 export default function EncounterView({ initialPatient, onClearInitialPatient }: EncounterViewProps = {}) {
-  const [activeTab, setActiveTab] = useState("SOAP Note");
+  const [activeTab, setActiveTab] = useState("Anamnesis & Vital Sign");
   const [doctorsList, setDoctorsList] = useState<any[]>([]);
   const [waitingQueueList, setWaitingQueueList] = useState<any[]>([]);
   const [registeredPatientsList, setRegisteredPatientsList] = useState<any[]>([]);
+
+  const currentStepIdx = tabs.indexOf(activeTab);
+
+  const handleNextStep = () => {
+    if (currentStepIdx < tabs.length - 1) {
+      setActiveTab(tabs[currentStepIdx + 1]);
+    }
+  };
+
+  const handlePrevStep = () => {
+    if (currentStepIdx > 0) {
+      setActiveTab(tabs[currentStepIdx - 1]);
+    }
+  };
 
   const [activePatient, setActivePatient] = useState({
     rm: "-",
@@ -669,26 +683,57 @@ const fetchPatientInfo = async (rm: string) => {
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div style={{ display: "flex", padding: "0 24px", borderBottom: "1px solid #f1f5f9", gap: 0, overflowX: "auto" }}>
-          {tabs.map(t => (
-            <button 
-              key={t} 
-              onClick={() => setActiveTab(t)}
-              style={{ 
-                padding: "13px 18px", fontSize: 13, fontWeight: 700, border: "none", background: "none", cursor: "pointer", whiteSpace: "nowrap",
-                color: activeTab === t ? "#0d9488" : "#64748b",
-                borderBottom: activeTab === t ? "3px solid #0d9488" : "3px solid transparent"
-              }}>
-              {t}
-            </button>
-          ))}
+        {/* Step-by-Step Stepper Progress Bar */}
+        <div style={{ display: "flex", padding: "12px 24px", borderBottom: "1px solid #e2e8f0", gap: 8, overflowX: "auto", background: "#f8fafc" }}>
+          {tabs.map((t, idx) => {
+            const isCurrent = activeTab === t;
+            const isDone = idx < currentStepIdx;
+
+            return (
+              <button 
+                key={t} 
+                onClick={() => setActiveTab(t)}
+                style={{ 
+                  display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 10, border: isCurrent ? "1.5px solid #0d9488" : "1px solid #cbd5e1",
+                  background: isCurrent ? "#0d9488" : isDone ? "#e0f2fe" : "#fff",
+                  color: isCurrent ? "#fff" : isDone ? "#0369a1" : "#475569",
+                  fontSize: 12.5, fontWeight: isCurrent ? 800 : 700, cursor: "pointer", whiteSpace: "nowrap",
+                  boxShadow: isCurrent ? "0 4px 10px rgba(13,148,136,0.2)" : "none"
+                }}>
+                <span style={{ 
+                  width: 20, height: 20, borderRadius: "50%", 
+                  background: isCurrent ? "#fff" : isDone ? "#0d9488" : "#e2e8f0", 
+                  color: isCurrent ? "#0d9488" : isDone ? "#fff" : "#475569", 
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 
+                }}>
+                  {isDone ? "✓" : idx + 1}
+                </span>
+                <span>Langkah {idx + 1}: {t}</span>
+              </button>
+            );
+          })}
         </div>
       </Container>
 
       {/* Main Examination Content */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 310px", gap: 16 }}>
         <div>
+          {/* Step Guidance Banner */}
+          <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "10px 16px", borderRadius: 12, marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: "#166534", display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ background: "#166534", color: "#fff", borderRadius: "50%", width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>
+                {currentStepIdx + 1}
+              </span>
+              <span>
+                {currentStepIdx === 0 && "Langkah 1: Pengukuran Tanda-Tanda Vital Pasien (TD, Nadi, Suhu, RR, SpO2, BB)."}
+                {currentStepIdx === 1 && "Langkah 2: Pencatatan SOAP Medis (Subjective, Objective, Assessment, Plan) / Quick Template Dokter."}
+                {currentStepIdx === 2 && "Langkah 3: Penetapan Diagnosis Kerja (ICD-10) & Tindakan Medis."}
+                {currentStepIdx === 3 && "Langkah 4: Penyusunan Resep Obat Pasien untuk dikirim ke Farmasi/Apotek."}
+                {currentStepIdx === 4 && "Langkah 5: Pemeriksaan Laboratorium & Finalisasi Sesi Pemeriksaan Pasien."}
+              </span>
+            </div>
+            <span style={{ fontSize: 11.5, fontWeight: 800, color: "#0d9488" }}>Langkah {currentStepIdx + 1} dari 5</span>
+          </div>
           {/* TAB: SOAP NOTE */}
           {activeTab === "SOAP Note" && (
             <Container style={{ padding: 24 }}>
@@ -1029,19 +1074,44 @@ const fetchPatientInfo = async (rm: string) => {
             </Container>
           )}
 
-          {/* Action Buttons */}
-          <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
+          {/* Step-by-Step Action Navigation Buttons */}
+          <div style={{ display: "flex", gap: 12, marginTop: 20, alignItems: "center", flexWrap: "wrap" }}>
             <button 
+              type="button"
+              disabled={currentStepIdx === 0}
+              onClick={handlePrevStep}
+              style={{ 
+                padding: "12px 18px", borderRadius: 12, border: "1.5px solid #cbd5e1", 
+                background: currentStepIdx === 0 ? "#f1f5f9" : "#fff", 
+                color: currentStepIdx === 0 ? "#94a3b8" : "#334155", 
+                fontSize: 13, fontWeight: 700, cursor: currentStepIdx === 0 ? "not-allowed" : "pointer" 
+              }}>
+              ← Langkah Sebelumnya
+            </button>
+
+            <button 
+              type="button"
               onClick={() => showToast("Draft encounter berhasil disimpan.")}
-              style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: "1.5px solid #e2e8f0", background: "#fff", fontSize: 13, fontWeight: 700, color: "#64748b", cursor: "pointer" }}>
+              style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: "1.5px solid #e2e8f0", background: "#fff", fontSize: 13, fontWeight: 700, color: "#64748b", cursor: "pointer", minWidth: 140 }}>
               Simpan Sebagai Draft
             </button>
             
-            <button 
-              onClick={handleFinalizeEncounter} 
-              style={{ flex: 2, padding: "12px 0", borderRadius: 12, border: "none", background: "linear-gradient(135deg, #0d9488, #0ea5e9)", fontSize: 13.5, fontWeight: 800, color: "#fff", cursor: "pointer", boxShadow: "0 4px 14px rgba(13,148,136,0.3)" }}>
-              ✓ Finalisasi Encounter & Auto-Complete Status
-            </button>
+            {currentStepIdx < tabs.length - 1 ? (
+              <button 
+                type="button"
+                onClick={handleNextStep} 
+                style={{ flex: 1.5, padding: "12px 0", borderRadius: 12, border: "none", background: "#0d9488", fontSize: 13.5, fontWeight: 800, color: "#fff", cursor: "pointer", boxShadow: "0 4px 14px rgba(13,148,136,0.3)", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, minWidth: 200 }}>
+                <span>Langkah Selanjutnya ({tabs[currentStepIdx + 1]})</span>
+                <span>→</span>
+              </button>
+            ) : (
+              <button 
+                type="button"
+                onClick={handleFinalizeEncounter} 
+                style={{ flex: 2, padding: "12px 0", borderRadius: 12, border: "none", background: "linear-gradient(135deg, #0d9488, #0ea5e9)", fontSize: 13.5, fontWeight: 800, color: "#fff", cursor: "pointer", boxShadow: "0 4px 14px rgba(13,148,136,0.3)", minWidth: 240 }}>
+                ✓ Finalisasi Encounter & Auto-Complete Status
+              </button>
+            )}
           </div>
         </div>
 

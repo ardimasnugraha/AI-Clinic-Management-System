@@ -22,13 +22,74 @@ const DOCTOR_PRESETS = [
   { name: "dr. Hendra Kusuma", poli: "Mata", sip: "SIP-2024-006", phone: "0811-2233-4455", color: "#3b82f6" }
 ];
 
+const MONTH_NAMES_ID = [
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni", 
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+];
+
 export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
   const [activeChartTab, setActiveChartTab] = useState<"kunjungan" | "pendapatan">("kunjungan");
   const [timeFilter, setTimeFilter] = useState<"Hari Ini" | "Minggu Ini" | "Bulan Ini">("Hari Ini");
   const [chartRangeFilter, setChartRangeFilter] = useState<"7 Hari" | "30 Hari">("7 Hari");
   
-  // Selected Calendar Day
-  const [selectedDay, setSelectedDay] = useState<number>(20);
+  // Real-time Dynamic Calendar States
+  const [viewDate, setViewDate] = useState<Date>(() => new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
+
+  // Automatically update current date when day changes in real-time (e.g. at midnight)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      setSelectedDate(prev => {
+        if (prev.getDate() !== now.getDate() || prev.getMonth() !== now.getMonth() || prev.getFullYear() !== now.getFullYear()) {
+          setViewDate(now);
+          return now;
+        }
+        return prev;
+      });
+    }, 5000); // Check every 5s for midnight date rollover
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const viewYear = viewDate.getFullYear();
+  const viewMonth = viewDate.getMonth();
+
+  const handlePrevMonth = () => {
+    setViewDate(new Date(viewYear, viewMonth - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setViewDate(new Date(viewYear, viewMonth + 1, 1));
+  };
+
+  const handleSelectDay = (dayNum: number) => {
+    const newDate = new Date(viewYear, viewMonth, dayNum);
+    setSelectedDate(newDate);
+
+    if (allApptsData && allApptsData.length > 0) {
+      const filtered = allApptsData.filter((a: any) => {
+        if (!a.scheduled_time && !a.date) return true;
+        const d = new Date(a.scheduled_time || a.date);
+        return d.getDate() === dayNum && d.getMonth() === viewMonth && d.getFullYear() === viewYear;
+      });
+      if (filtered.length > 0) {
+        setAppointmentsList(filtered.map((a: any) => ({
+          time: a.duration ? a.duration.split(" - ")[0] : a.time || "08:30",
+          name: a.doctor_name || a.patientName || a.name || "Pasien",
+          type: a.poli || "Konsultasi Umum",
+          status: a.status === "menunggu" ? "Menunggu" : a.status === "selesai" ? "Selesai" : "Terjadwal"
+        })));
+      }
+    }
+  };
+
+  const daysInViewMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const firstDayRaw = new Date(viewYear, viewMonth, 1).getDay(); // 0 = Sun, 1 = Mon ...
+  const startOffset = (firstDayRaw + 6) % 7; // Monday-first: 0 = Mon ... 6 = Sun
+
+  const prevMonthDays = new Date(viewYear, viewMonth, 0).getDate();
+  const prevDaysList = Array.from({ length: startOffset }, (_, i) => prevMonthDays - startOffset + 1 + i);
 
   // Modal States
   const [selectedDoctorModal, setSelectedDoctorModal] = useState<any | null>(null);
@@ -360,26 +421,7 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
     await loadDashboardData();
   };
 
-  // Handler when clicking a day on calendar
-  const handleSelectDay = (day: number) => {
-    setSelectedDay(day);
-    if (allApptsData.length > 0) {
-      const filtered = allApptsData.filter((a: any) => {
-        if (!a.scheduled_time) return true;
-        const d = new Date(a.scheduled_time);
-        return d.getDate() === day;
-      });
-      if (filtered.length > 0) {
-        setAppointmentsList(filtered.map((a: any) => ({
-          time: a.duration ? a.duration.split(" - ")[0] : "08:30",
-          name: a.doctor_name || "Pasien",
-          type: a.poli || "Konsultasi Umum",
-          status: a.status === "menunggu" ? "Menunggu" : a.status === "selesai" ? "Selesai" : "Terjadwal"
-        })));
-        return;
-      }
-    }
-  };
+
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: "Inter, system-ui, sans-serif" }}>
@@ -847,13 +889,21 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
             {/* Left Mini Calendar */}
             <div style={{ background: "#fafafa", borderRadius: 14, padding: 12, border: "1px solid #f1f5f9" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                <span style={{ fontSize: 12, fontWeight: 800, color: "#0f172a" }}>{selectedDay} Mei 2025</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: "#0f172a" }}>
+                  {selectedDate.getDate()} {MONTH_NAMES_ID[selectedDate.getMonth()]} {selectedDate.getFullYear()}
+                </span>
                 <div style={{ display: "flex", gap: 4 }}>
-                  <button onClick={() => handleSelectDay(Math.max(1, selectedDay - 1))} style={{ border: "none", background: "none", cursor: "pointer", padding: 2 }}><ChevronLeft style={{ width: 14, height: 14, color: "#64748b" }} /></button>
-                  <button onClick={() => handleSelectDay(Math.min(31, selectedDay + 1))} style={{ border: "none", background: "none", cursor: "pointer", padding: 2 }}><ChevronRight style={{ width: 14, height: 14, color: "#64748b" }} /></button>
+                  <button type="button" onClick={handlePrevMonth} title="Bulan Sebelumnya" style={{ border: "none", background: "none", cursor: "pointer", padding: 2 }}>
+                    <ChevronLeft style={{ width: 14, height: 14, color: "#64748b" }} />
+                  </button>
+                  <button type="button" onClick={handleNextMonth} title="Bulan Berikutnya" style={{ border: "none", background: "none", cursor: "pointer", padding: 2 }}>
+                    <ChevronRight style={{ width: 14, height: 14, color: "#64748b" }} />
+                  </button>
                 </div>
               </div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textAlign: "center", marginBottom: 8 }}>Mei 2025</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textAlign: "center", marginBottom: 8 }}>
+                {MONTH_NAMES_ID[viewMonth]} {viewYear}
+              </div>
               
               {/* Day Headers */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", textAlign: "center", fontSize: 9.5, fontWeight: 700, color: "#94a3b8", marginBottom: 6 }}>
@@ -862,21 +912,36 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
               
               {/* Calendar Grid */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", textAlign: "center", fontSize: 10.5, fontWeight: 600, color: "#334155", gap: "4px 0" }}>
-                <span style={{ color: "#cbd5e1" }}>28</span><span style={{ color: "#cbd5e1" }}>29</span><span style={{ color: "#cbd5e1" }}>30</span>
-                {[...Array(31)].map((_, i) => {
+                {prevDaysList.map((d, i) => (
+                  <span key={`prev-${i}`} style={{ color: "#cbd5e1" }}>{d}</span>
+                ))}
+                {[...Array(daysInViewMonth)].map((_, i) => {
                   const d = i + 1;
-                  const isSel = d === selectedDay;
+                  const isSel = 
+                    selectedDate.getDate() === d && 
+                    selectedDate.getMonth() === viewMonth && 
+                    selectedDate.getFullYear() === viewYear;
+
+                  const today = new Date();
+                  const isToday = 
+                    today.getDate() === d && 
+                    today.getMonth() === viewMonth && 
+                    today.getFullYear() === viewYear;
+
                   return (
                     <span 
                       key={d} 
                       onClick={() => handleSelectDay(d)}
+                      title={isToday ? "Hari Ini" : `${d} ${MONTH_NAMES_ID[viewMonth]} ${viewYear}`}
                       style={{ 
                         cursor: "pointer",
-                        background: isSel ? "#0d9488" : "transparent",
-                        color: isSel ? "#fff" : "#334155",
+                        background: isSel ? "#0d9488" : isToday ? "#ccfbf1" : "transparent",
+                        color: isSel ? "#fff" : isToday ? "#0f766e" : "#334155",
+                        border: isToday && !isSel ? "1.5px solid #0d9488" : "none",
                         borderRadius: "50%", width: 22, height: 22,
                         display: "inline-flex", alignItems: "center", justifyContent: "center",
-                        fontWeight: isSel ? 800 : 600, margin: "0 auto"
+                        fontWeight: isSel || isToday ? 800 : 600, margin: "0 auto",
+                        boxShadow: isSel ? "0 2px 6px rgba(13,148,136,0.3)" : "none"
                       }}>
                       {d}
                     </span>
@@ -1298,7 +1363,7 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
             </div>
             <div>
               <div style={{ fontSize: 11.5, fontWeight: 800, color: "#0f172a" }}>Backup Data</div>
-              <div style={{ fontSize: 10, color: "#64748b" }}>Terakhir: 20 Mei 2025 02:00</div>
+              <div style={{ fontSize: 10, color: "#64748b" }}>Terakhir: {selectedDate.getDate()} {MONTH_NAMES_ID[selectedDate.getMonth()]} {selectedDate.getFullYear()} 02:00</div>
               <span style={{ fontSize: 9.5, fontWeight: 800, color: "#166534" }}>Status: ● Berhasil</span>
             </div>
           </div>

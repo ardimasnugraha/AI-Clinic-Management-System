@@ -58,6 +58,17 @@ const DEFAULT_APPOINTMENTS: AppointmentItem[] = [];
 export default function AppointmentsView({ initialPatient, onClearInitialPatient, onNavigateTab }: AppointmentsViewProps) {
   const [appointments, setAppointments] = useState<AppointmentItem[]>(DEFAULT_APPOINTMENTS);
   const [doctorsList, setDoctorsList] = useState<any[]>([]);
+
+  // Real-time Week Date Range Calculation
+  const now = new Date();
+  const currentDayOfWeek = (now.getDay() + 6) % 7; // Monday = 0
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - currentDayOfWeek);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+
+  const MONTH_NAMES_ID = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+  const weekRangeStr = `${monday.getDate()} - ${sunday.getDate()} ${MONTH_NAMES_ID[sunday.getMonth()]} ${sunday.getFullYear()}`;
   const [queueList, setQueueList] = useState<any[]>([]);
   const [registeredPatients, setRegisteredPatients] = useState<Array<{ rm: string; name: string; phone?: string }>>([]);
   const [isManualPatientInput, setIsManualPatientInput] = useState(false);
@@ -802,7 +813,7 @@ export default function AppointmentsView({ initialPatient, onClearInitialPatient
         <div style={{ display: "flex", flexDirection: "column" }}>
           <span style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", marginBottom: 2 }}>Tanggal</span>
           <div style={{ padding: "8px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 12, fontWeight: 700, color: "#334155", background: "#fff", display: "flex", alignItems: "center", gap: 6 }}>
-            <CalendarIcon style={{ width: 14, height: 14, color: "#0d9488" }} /> 19 - 25 Mei 2025
+            <CalendarIcon style={{ width: 14, height: 14, color: "#0d9488" }} /> {weekRangeStr}
           </div>
         </div>
 

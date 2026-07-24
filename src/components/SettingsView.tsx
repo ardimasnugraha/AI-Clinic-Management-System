@@ -15,7 +15,6 @@ const Container = ({ style, ...p }: any) => (
 const sections = [
   { id: "profil", label: "Profil Klinik", icon: Building2, color: "#0d9488" },
   { id: "dokter", label: "Manajemen Dokter", icon: Stethoscope, color: "#8b5cf6" },
-  { id: "notif", label: "Notifikasi", icon: Bell, color: "#f97316" },
   { id: "keamanan", label: "Keamanan", icon: Shield, color: "#ef4444" },
   { id: "database", label: "Database & Reset Data", icon: Database, color: "#22c55e" },
   { id: "tampilan", label: "Tampilan", icon: Palette, color: "#3b82f6" },
@@ -469,30 +468,9 @@ export default function SettingsView() {
             </Container>
           )}
 
-          {active === "notif" && (
-            <Container style={{ padding: 26 }}>
-              <h2 style={{ fontSize: 17, fontWeight: 800, color: "#0f172a", margin: "0 0 20px" }}>Notifikasi Sistem</h2>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {[
-                  { label: "Panggilan WhatsApp Antrean Pasien", channel: "WhatsApp API", enabled: true },
-                  { label: "Pengingat Jadwal Appointment", channel: "SMS / WhatsApp", enabled: true },
-                  { label: "Notifikasi Hasil Lab Siap", channel: "Push Notification", enabled: true },
-                ].map((n, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderRadius: 12, border: "1px solid #e8f0fe" }}>
-                    <div>
-                      <p style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", margin: 0 }}>{n.label}</p>
-                      <p style={{ fontSize: 11, color: "#94a3b8", margin: 0 }}>Channel: {n.channel}</p>
-                    </div>
-                    <span style={{ background: "#dcfce7", color: "#15803d", fontSize: 11, fontWeight: 800, padding: "4px 12px", borderRadius: 20 }}>
-                      Aktif
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </Container>
-          )}
 
-          {!["profil", "dokter", "database", "keamanan", "notif"].includes(active) && (
+
+          {!["profil", "dokter", "database", "keamanan"].includes(active) && (
             <Container style={{ padding: 40, textAlign: "center" }}>
               <Settings style={{ width: 40, height: 40, color: "#94a3b8", margin: "0 auto 12px" }} />
               <p style={{ fontSize: 14, color: "#64748b", fontWeight: 600 }}>Pengaturan sedang disesuaikan...</p>

@@ -39,6 +39,7 @@ export default function SettingsView() {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [patients, setPatients] = useState<any[]>([]);
   const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
   // Form State for Add/Edit Doctor
   const [docForm, setDocForm] = useState({
@@ -80,6 +81,15 @@ export default function SettingsView() {
   };
 
   useEffect(() => {
+    // Load dark mode preference
+    const savedDark = localStorage.getItem("clinic_dark_mode") === "true";
+    setIsDarkMode(savedDark);
+    if (savedDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+
     loadDoctors();
 
     async function loadPatients() {
@@ -106,6 +116,18 @@ export default function SettingsView() {
       console.error(e);
       alert("Gagal menghapus pasien dari Supabase.");
     }
+  };
+
+  const handleToggleDarkMode = () => {
+    const next = !isDarkMode;
+    setIsDarkMode(next);
+    localStorage.setItem("clinic_dark_mode", String(next));
+    if (next) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+    showToast(next ? "🌙 Mode Gelap diaktifkan" : "☀️ Mode Terang diaktifkan");
   };
 
   const handleSaveSettings = () => {
@@ -470,10 +492,95 @@ export default function SettingsView() {
 
 
 
-          {!["profil", "dokter", "database", "keamanan"].includes(active) && (
+          {!["profil", "dokter", "database", "keamanan", "tampilan"].includes(active) && (
             <Container style={{ padding: 40, textAlign: "center" }}>
               <Settings style={{ width: 40, height: 40, color: "#94a3b8", margin: "0 auto 12px" }} />
               <p style={{ fontSize: 14, color: "#64748b", fontWeight: 600 }}>Pengaturan sedang disesuaikan...</p>
+            </Container>
+          )}
+
+          {/* TAB TAMPILAN */}
+          {active === "tampilan" && (
+            <Container style={{ padding: 26, background: isDarkMode ? "#1e293b" : "#fff", border: isDarkMode ? "1px solid #334155" : undefined }}>
+              <h2 style={{ fontSize: 17, fontWeight: 800, color: isDarkMode ? "#f1f5f9" : "#0f172a", margin: "0 0 6px" }}>Tampilan</h2>
+              <p style={{ fontSize: 12, color: isDarkMode ? "#94a3b8" : "#64748b", margin: "0 0 24px" }}>Sesuaikan tampilan antarmuka sistem klinik</p>
+
+              {/* Dark Mode Toggle Card */}
+              <div style={{
+                background: isDarkMode ? "#0f172a" : "#f8fafc",
+                border: `1.5px solid ${isDarkMode ? "#334155" : "#e2e8f0"}`,
+                borderRadius: 16,
+                padding: "20px 22px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 16,
+                marginBottom: 16,
+                transition: "all 0.3s ease"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <div style={{
+                    width: 48, height: 48, borderRadius: 14,
+                    background: isDarkMode ? "linear-gradient(135deg, #1e3a5f, #0f2a4a)" : "linear-gradient(135deg, #fef3c7, #fde68a)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 22, transition: "all 0.3s ease",
+                    boxShadow: isDarkMode ? "0 4px 12px rgba(14,165,233,0.2)" : "0 4px 12px rgba(245,158,11,0.2)"
+                  }}>
+                    {isDarkMode ? "🌙" : "☀️"}
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 800, color: isDarkMode ? "#f1f5f9" : "#0f172a", margin: 0 }}>
+                      {isDarkMode ? "Mode Gelap (Dark Mode)" : "Mode Terang (Light Mode)"}
+                    </p>
+                    <p style={{ fontSize: 11.5, color: isDarkMode ? "#94a3b8" : "#64748b", margin: "2px 0 0" }}>
+                      {isDarkMode
+                        ? "Tampilan gelap aktif — nyaman untuk mata di malam hari"
+                        : "Tampilan terang aktif — klik untuk beralih ke mode gelap"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Toggle Switch */}
+                <button
+                  type="button"
+                  onClick={handleToggleDarkMode}
+                  style={{
+                    width: 54, height: 30, borderRadius: 30,
+                    background: isDarkMode ? "#0ea5e9" : "#cbd5e1",
+                    border: "none", cursor: "pointer", position: "relative",
+                    transition: "background 0.3s ease",
+                    flexShrink: 0,
+                    boxShadow: isDarkMode ? "0 0 12px rgba(14,165,233,0.5)" : "none"
+                  }}
+                  title={isDarkMode ? "Matikan Dark Mode" : "Aktifkan Dark Mode"}
+                >
+                  <span style={{
+                    position: "absolute", top: 3,
+                    left: isDarkMode ? 27 : 3,
+                    width: 24, height: 24, borderRadius: "50%",
+                    background: "#fff",
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
+                    transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 12
+                  }}>
+                    {isDarkMode ? "🌙" : "☀️"}
+                  </span>
+                </button>
+              </div>
+
+              {/* Info Banner */}
+              <div style={{
+                background: isDarkMode ? "rgba(14,165,233,0.1)" : "#eff6ff",
+                border: `1px solid ${isDarkMode ? "rgba(14,165,233,0.3)" : "#bfdbfe"}`,
+                borderRadius: 12, padding: "12px 16px",
+                display: "flex", alignItems: "center", gap: 10
+              }}>
+                <span style={{ fontSize: 18 }}>ℹ️</span>
+                <p style={{ fontSize: 12, color: isDarkMode ? "#7dd3fc" : "#1d4ed8", margin: 0, fontWeight: 600 }}>
+                  Preferensi tampilan disimpan otomatis di perangkat ini dan berlaku saat Anda login kembali.
+                </p>
+              </div>
             </Container>
           )}
 

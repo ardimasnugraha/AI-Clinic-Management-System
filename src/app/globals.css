@@ -9,10 +9,7 @@
   --text-main: #0f172a;
   --text-muted: #64748b;
   --border-color: #f3e8e2;
-}
 
-/* Custom design tokens */
-:root {
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   
@@ -34,7 +31,26 @@
   --color-yellow-350: #f59e0b;
 }
 
+/* ======================== DARK MODE ======================== */
+html.dark {
+  --bg-page: #0f172a;
+  --bg-card: #1e293b;
+  --bg-sidebar: #1a2640;
+  --color-primary: #14b8a6;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+}
 
+html.dark body {
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark ::-webkit-scrollbar-track { background: #1e293b; }
+html.dark ::-webkit-scrollbar-thumb { background: #475569; }
+
+/* ======================== BASE ======================== */
 * { box-sizing: border-box; }
 
 html { scroll-behavior: smooth; }
@@ -44,6 +60,7 @@ body {
   color: #000000 !important;
   font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* ======================== SCROLLBAR ======================== */
@@ -92,8 +109,7 @@ body {
   box-shadow: 0 4px 14px rgba(255,107,53,0.35);
 }
 
-/* ======================== HIGH CONTRAST TEXT - targeted fix ======================== */
-/* Only apply to actual content areas, not UI components */
+/* ======================== HIGH CONTRAST TEXT ======================== */
 main p, main label, main td, main th, main h1, main h2, main h3, main h4, main h5, main h6 {
   color: #0f172a;
 }

@@ -64,6 +64,14 @@ export default function MainPage() {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    // Apply dark mode preference immediately on mount
+    const savedDark = localStorage.getItem("clinic_dark_mode") === "true";
+    if (savedDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+
     // Load session
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
@@ -76,6 +84,7 @@ export default function MainPage() {
         router.push("/login");
       }
     });
+
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {

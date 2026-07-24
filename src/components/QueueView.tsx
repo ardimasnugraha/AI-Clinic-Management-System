@@ -36,6 +36,7 @@ const POLI_CONFIG: Record<string, { prefix: string; color: string; bg: string; d
   Mata: { prefix: "D", color: "#3b82f6", bg: "#eff6ff", doctor: "dr. Hendra Kusuma" },
   Kulit: { prefix: "E", color: "#ec4899", bg: "#fdf2f8", doctor: "dr. Laila Rahmawati" },
   Anak: { prefix: "F", color: "#22c55e", bg: "#f0fdf4", doctor: "dr. Rudi Setiawan" },
+  "Penyakit Dalam": { prefix: "G", color: "#0284c7", bg: "#e0f2fe", doctor: "dr. Bagus W." },
 };
 
 const getTodayStr = () => {

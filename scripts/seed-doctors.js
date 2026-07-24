@@ -149,6 +149,24 @@ const USERS_TO_CREATE = [
       status: "Aktif",
     },
   },
+  {
+    email: "bagus.wibowo@klinikai.co.id",
+    password: DEFAULT_PASSWORD,
+    user_metadata: {
+      full_name: "dr. Bagus W.",
+      role: "Dokter",
+      clinic_name: "Klinik Sehat Sentosa",
+    },
+    doctor_profile: {
+      doctor_id: "DOC007",
+      full_name: "dr. Bagus W.",
+      poli: "Poli Penyakit Dalam",
+      sip: "SIP-2024-007",
+      phone: "0811-3344-5566",
+      color: "#0284c7",
+      status: "Aktif",
+    },
+  },
 ];
 
 async function seedUsers() {

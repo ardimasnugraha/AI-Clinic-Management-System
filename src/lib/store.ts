@@ -368,6 +368,77 @@ export const resetAllData = () => {
   localStorage.removeItem("clinic_lab_v1");
   localStorage.removeItem("clinic_audit_logs_v1");
   localStorage.removeItem("clinic_documents_v1");
-  localStorage.removeItem("clinic_doctors_v1");
   logAuditEvent("Reset System Data", "System", "Seluruh data sampel berhasil dibersihkan");
 };
+
+// ======================== CLINIC PROFILE & SECURITY STORE ========================
+export interface ClinicProfile {
+  namaKlinik: string;
+  cabang: string;
+  alamat: string;
+  phone: string;
+  email: string;
+  website: string;
+  noIzin: string;
+  jamOperasional: string;
+}
+
+export const defaultClinicProfile: ClinicProfile = {
+  namaKlinik: "Klinik Sehat Sentosa",
+  cabang: "Semarang - Pusat",
+  alamat: "Jl. Pemuda No. 45, Semarang",
+  phone: "(024) 8899-7766",
+  email: "info@kliniksehat.co.id",
+  website: "www.kliniksehat.co.id",
+  noIzin: "IZN-2024-001/DINKES",
+  jamOperasional: "07:00 - 21:00 WIB (Senin - Sabtu)"
+};
+
+export const getClinicProfile = (): ClinicProfile => {
+  if (typeof window === "undefined") return defaultClinicProfile;
+  const stored = localStorage.getItem("clinic_profile_v1");
+  if (!stored) return defaultClinicProfile;
+  try {
+    return { ...defaultClinicProfile, ...JSON.parse(stored) };
+  } catch (e) {
+    return defaultClinicProfile;
+  }
+};
+
+export const saveClinicProfile = (profile: ClinicProfile) => {
+  if (typeof window === "undefined") return;
+  localStorage.setItem("clinic_profile_v1", JSON.stringify(profile));
+  logAuditEvent("Update Profil Klinik", "Pengaturan", `Memperbarui profil ${profile.namaKlinik}`);
+};
+
+export interface SecuritySettings {
+  twoFactor: boolean;
+  sessionTimeout: boolean;
+  medicalRecordEncryption: boolean;
+  auditLog: boolean;
+}
+
+export const defaultSecuritySettings: SecuritySettings = {
+  twoFactor: true,
+  sessionTimeout: true,
+  medicalRecordEncryption: true,
+  auditLog: true
+};
+
+export const getSecuritySettings = (): SecuritySettings => {
+  if (typeof window === "undefined") return defaultSecuritySettings;
+  const stored = localStorage.getItem("clinic_security_v1");
+  if (!stored) return defaultSecuritySettings;
+  try {
+    return { ...defaultSecuritySettings, ...JSON.parse(stored) };
+  } catch (e) {
+    return defaultSecuritySettings;
+  }
+};
+
+export const saveSecuritySettings = (sec: SecuritySettings) => {
+  if (typeof window === "undefined") return;
+  localStorage.setItem("clinic_security_v1", JSON.stringify(sec));
+  logAuditEvent("Update Pengaturan Keamanan", "Pengaturan", "Memperbarui konfigurasi keamanan sistem");
+};
+

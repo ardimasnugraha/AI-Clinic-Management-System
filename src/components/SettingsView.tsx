@@ -5,7 +5,11 @@ import {
   Settings, User, Bell, Shield, Database, Building2, Palette, Save, 
   ChevronRight, Lock, Globe, Smartphone, Plus, Stethoscope, Edit2, Trash2, Check, RefreshCw, AlertTriangle
 } from "lucide-react";
-import { Doctor, getStoredDoctors, saveStoredDoctors, addStoredDoctor, resetAllData } from "@/lib/store";
+import { 
+  Doctor, getStoredDoctors, saveStoredDoctors, addStoredDoctor, resetAllData,
+  ClinicProfile, defaultClinicProfile, getClinicProfile, saveClinicProfile,
+  SecuritySettings, defaultSecuritySettings, getSecuritySettings, saveSecuritySettings
+} from "@/lib/store";
 import { supabase } from "@/lib/supabase/client";
 
 const Container = ({ style, ...p }: any) => (
@@ -38,6 +42,12 @@ export default function SettingsView() {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [patients, setPatients] = useState<any[]>([]);
   const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
+
+  // Profil Klinik State
+  const [profileForm, setProfileForm] = useState<ClinicProfile>(defaultClinicProfile);
+
+  // Security Settings State
+  const [securityForm, setSecurityForm] = useState<SecuritySettings>(defaultSecuritySettings);
 
   // Form State for Add/Edit Doctor
   const [docForm, setDocForm] = useState({
@@ -79,6 +89,10 @@ export default function SettingsView() {
   };
 
   useEffect(() => {
+    // Load persisted clinic profile & security settings
+    setProfileForm(getClinicProfile());
+    setSecurityForm(getSecuritySettings());
+
     loadDoctors();
 
     async function loadPatients() {
@@ -108,9 +122,14 @@ export default function SettingsView() {
   };
 
   const handleSaveSettings = () => {
+    saveClinicProfile(profileForm);
+    saveSecuritySettings(securityForm);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("clinic_profile_updated"));
+    }
     setSaved(true);
-    showToast("Pengaturan klinik berhasil disimpan.");
-    setTimeout(() => setSaved(false), 2000);
+    showToast("✓ Pengaturan klinik berhasil disimpan & diperbarui secara real-time!");
+    setTimeout(() => setSaved(false), 2500);
   };
 
   const handleOpenAddDoctor = () => {
@@ -290,21 +309,22 @@ export default function SettingsView() {
               <h2 style={{ fontSize: 17, fontWeight: 800, color: "#0f172a", margin: "0 0 20px" }}>Profil Utama Klinik</h2>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 {[
-                  { label: "Nama Klinik", val: "Klinik Sehat Sentosa", ph: "Nama klinik..." },
-                  { label: "Cabang", val: "Semarang - Pusat", ph: "Cabang..." },
-                  { label: "Alamat Lengkap", val: "Jl. Pemuda No. 45, Semarang", ph: "Alamat..." },
-                  { label: "No. Telepon Hotline", val: "(024) 8899-7766", ph: "No. telepon..." },
-                  { label: "Email Resmi Klinik", val: "info@kliniksehat.co.id", ph: "Email..." },
-                  { label: "Website", val: "www.kliniksehat.co.id", ph: "Website..." },
-                  { label: "No. Izin Operasional", val: "IZN-2024-001/DINKES", ph: "No. izin..." },
-                  { label: "Jam Operasional", val: "07:00 - 21:00 WIB (Senin - Sabtu)", ph: "Jam operasional..." },
+                  { label: "Nama Klinik", key: "namaKlinik", val: profileForm.namaKlinik, ph: "Nama klinik..." },
+                  { label: "Cabang", key: "cabang", val: profileForm.cabang, ph: "Cabang..." },
+                  { label: "Alamat Lengkap", key: "alamat", val: profileForm.alamat, ph: "Alamat..." },
+                  { label: "No. Telepon Hotline", key: "phone", val: profileForm.phone, ph: "No. telepon..." },
+                  { label: "Email Resmi Klinik", key: "email", val: profileForm.email, ph: "Email..." },
+                  { label: "Website", key: "website", val: profileForm.website, ph: "Website..." },
+                  { label: "No. Izin Operasional", key: "noIzin", val: profileForm.noIzin, ph: "No. izin..." },
+                  { label: "Jam Operasional", key: "jamOperasional", val: profileForm.jamOperasional, ph: "Jam operasional..." },
                 ].map((f, i) => (
-                  <div key={i} style={{ gridColumn: i === 2 || i === 6 ? "1/-1" : "auto" }}>
+                  <div key={f.key} style={{ gridColumn: i === 2 || i === 6 ? "1/-1" : "auto" }}>
                     <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>{f.label}</label>
                     <input 
-                      defaultValue={f.val} 
+                      value={f.val} 
+                      onChange={(e) => setProfileForm({ ...profileForm, [f.key]: e.target.value })}
                       placeholder={f.ph}
-                      style={{ width: "100%", padding: "9.5px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", background: "#f8fafc", fontSize: 13, color: "#1e293b", outline: "none" }} 
+                      style={{ width: "100%", padding: "9.5px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", background: "#ffffff", fontSize: 13, color: "#1e293b", outline: "none" }} 
                     />
                   </div>
                 ))}
@@ -442,25 +462,35 @@ export default function SettingsView() {
             </Container>
           )}
 
-          {/* TAB 3 & 4: KEAMANAN & NOTIFIKASI */}
+          {/* TAB 3: KEAMANAN */}
           {active === "keamanan" && (
             <Container style={{ padding: 26 }}>
               <h2 style={{ fontSize: 17, fontWeight: 800, color: "#0f172a", margin: "0 0 20px" }}>Keamanan Sistem & Hak Akses</h2>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {[
-                  { label: "Autentikasi Dua Faktor (2FA)", desc: "Wajibkan 2FA untuk semua staf klinik", enabled: true },
-                  { label: "Session Timeout Otomatis", desc: "Logout otomatis setelah 30 menit tidak aktif", enabled: true },
-                  { label: "Enkripsi Rekam Medis (AES-256)", desc: "Enkripsi data sensitis pasien di Supabase", enabled: true },
-                  { label: "Log Audit Transaksi Keamanan", desc: "Catat semua aktivitas perubaham data", enabled: true },
-                ].map((s, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderRadius: 12, border: "1px solid #e8f0fe" }}>
+                  { key: "twoFactor", label: "Autentikasi Dua Faktor (2FA)", desc: "Wajibkan 2FA untuk semua staf klinik", enabled: securityForm.twoFactor },
+                  { key: "sessionTimeout", label: "Session Timeout Otomatis", desc: "Logout otomatis setelah 30 menit tidak aktif", enabled: securityForm.sessionTimeout },
+                  { key: "medicalRecordEncryption", label: "Enkripsi Rekam Medis (AES-256)", desc: "Enkripsi data sensitif pasien di Supabase", enabled: securityForm.medicalRecordEncryption },
+                  { key: "auditLog", label: "Log Audit Transaksi Keamanan", desc: "Catat semua aktivitas perubahan data", enabled: securityForm.auditLog },
+                ].map((s) => (
+                  <div key={s.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderRadius: 12, border: "1px solid #e8f0fe" }}>
                     <div>
                       <p style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", margin: 0 }}>{s.label}</p>
                       <p style={{ fontSize: 11, color: "#64748b", margin: 0 }}>{s.desc}</p>
                     </div>
-                    <span style={{ background: s.enabled ? "#dcfce7" : "#f1f5f9", color: s.enabled ? "#15803d" : "#64748b", fontSize: 11, fontWeight: 800, padding: "4px 12px", borderRadius: 20 }}>
-                      {s.enabled ? "Aktif" : "Non-aktif"}
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSecurityForm(prev => ({ ...prev, [s.key]: !prev[s.key as keyof SecuritySettings] }))}
+                      style={{
+                        background: s.enabled ? "#dcfce7" : "#f1f5f9",
+                        color: s.enabled ? "#15803d" : "#64748b",
+                        border: `1px solid ${s.enabled ? "#bbf7d0" : "#cbd5e1"}`,
+                        fontSize: 11, fontWeight: 800, padding: "5px 14px", borderRadius: 20, cursor: "pointer",
+                        transition: "all 0.2s ease"
+                      }}
+                    >
+                      {s.enabled ? "✓ Aktif" : "Non-aktif"}
+                    </button>
                   </div>
                 ))}
               </div>

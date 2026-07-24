@@ -903,13 +903,6 @@ const fetchPatientInfo = async (rm: string) => {
             <Container style={{ padding: 24 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
                 <h3 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", margin: 0 }}>Catatan SOAP (Subjective, Objective, Assessment, Plan)</h3>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button 
-                    onClick={() => showToast("Draft SOAP berhasil disimpan.")}
-                    style={{ display: "flex", alignItems: "center", gap: 6, background: "#0d9488", color: "#fff", border: "none", borderRadius: 10, padding: "8px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                    <Save style={{ width: 14, height: 14 }} /> Simpan Draft
-                  </button>
-                </div>
               </div>
 
               {/* Template Buttons */}
@@ -1497,19 +1490,12 @@ const fetchPatientInfo = async (rm: string) => {
               }}>
               ← Langkah Sebelumnya
             </button>
-
-            <button 
-              type="button"
-              onClick={() => showToast("Draft encounter berhasil disimpan.")}
-              style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: "1.5px solid #e2e8f0", background: "#fff", fontSize: 13, fontWeight: 700, color: "#64748b", cursor: "pointer", minWidth: 140 }}>
-              Simpan Sebagai Draft
-            </button>
             
             {currentStepIdx < tabs.length - 1 ? (
               <button 
                 type="button"
                 onClick={handleNextStep} 
-                style={{ flex: 1.5, padding: "12px 0", borderRadius: 12, border: "none", background: "#0d9488", fontSize: 13.5, fontWeight: 800, color: "#fff", cursor: "pointer", boxShadow: "0 4px 14px rgba(13,148,136,0.3)", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, minWidth: 200 }}>
+                style={{ flex: 2, padding: "12px 0", borderRadius: 12, border: "none", background: "#0d9488", fontSize: 13.5, fontWeight: 800, color: "#fff", cursor: "pointer", boxShadow: "0 4px 14px rgba(13,148,136,0.3)", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, minWidth: 200 }}>
                 <span>Langkah Selanjutnya ({tabs[currentStepIdx + 1]})</span>
                 <span>→</span>
               </button>

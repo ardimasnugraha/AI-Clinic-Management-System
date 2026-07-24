@@ -256,7 +256,7 @@ const fetchPatientInfo = async (rm: string) => {
     }
   };
 
-  const applySoapTemplate = (type: "gigi" | "jantung" | "kulit" | "demam" | "mata") => {
+  const applySoapTemplate = (type: "gigi" | "jantung" | "kulit" | "demam" | "mata" | "penyakit-dalam" | "anak" | "umum") => {
     if (type === "gigi") {
       setSoap({
         S: "Pasien mengeluh sakit gigi geraham bawah kanan berdenyut sejak 2 hari, bertambah ngilu saat minum dingin dan makan.",
@@ -266,24 +266,24 @@ const fetchPatientInfo = async (rm: string) => {
       });
       setVitals({ td: "120/80", nadi: "80", suhu: "36.5", rr: "18", spo2: "99", bb: "65" });
       setPrescriptions([
-        { nama: "Asam Mefenamat 500mg", dosis: "3x1 Tablet (Sesudah Makan)", jumlah: 10, harga: 15000 },
-        { nama: "Amoksisilin 500mg", dosis: "3x1 Kapsul (Sesudah Makan)", jumlah: 15, harga: 22500 }
+        { nama: "Asam Mafenamat 500mg", dosis: "3x1 Kaplet (Sesudah Makan)", jumlah: 10, harga: 2000 },
+        { nama: "Ciprofloxacin 500mg", dosis: "2x1 Kaplet (Habiskan)", jumlah: 10, harga: 4000 }
       ]);
-      showToast("Template SOAP Poli Gigi diterapkan!");
+      showToast("Template SOAP Poli Gigi (drg. Sari Dewi) diterapkan!");
     } else if (type === "jantung") {
       setSoap({
         S: "Pasien mengeluh dada kiri terasa berat seperti ditindih sejak tadi pagi, menjalar ke punggung, disertai sesak napas dan keringat dingin.",
         O: "TD: 150/90 mmHg, Nadi: 96 x/menit, Suhu: 36.5°C, RR: 22 x/menit, SpO2: 97%. Auskultasi Jantung: BJ I-II reguler, gallop (-), murmur (-).",
         A: "Angina Pektoris Unstable / Suspect Penyakit Jantung Koroner (ICD-10: I20.0)",
-        P: "1. ISDN 5mg Sublingual (bila nyeri dada)\n2. Aspirin 80mg 1x1 tablet\n3. Clopidogrel 75mg 1x1 tablet\n4. Rujuk Spesialis Jantung & Pembuluh Darah (Sp.JP) untuk EKG & Echocardiography."
+        P: "1. ISDN 5mg Sublingual (bila nyeri dada)\n2. Amlodipine 10mg 1x1 tablet\n3. Bisoprolol 5mg 1x1 tablet\n4. Rujuk Spesialis Jantung & Pembuluh Darah (Sp.JP) untuk EKG & Echocardiography."
       });
       setVitals({ td: "150/90", nadi: "96", suhu: "36.5", rr: "22", spo2: "97", bb: "70" });
       setPrescriptions([
-        { nama: "Isosorbide Dinitrate (ISDN) 5mg", dosis: "1x1 Tablet Sublingual (Bila Nyeri)", jumlah: 10, harga: 25000 },
-        { nama: "Aspirin (Aspilet) 80mg", dosis: "1x1 Tablet (Sesudah Makan)", jumlah: 30, harga: 20000 },
-        { nama: "Clopidogrel 75mg", dosis: "1x1 Tablet (Sesudah Makan)", jumlah: 30, harga: 65000 }
+        { nama: "Amlodipine 10mg", dosis: "1x1 Tablet Pagi (Sesudah Makan)", jumlah: 30, harga: 3000 },
+        { nama: "Bisoprolol 5mg", dosis: "1x1 Tablet Pagi (Sesudah Makan)", jumlah: 30, harga: 4500 },
+        { nama: "ISDN (Isosorbide Dinitrate) 5mg", dosis: "1x1 Tablet Sublingual (Bila Nyeri)", jumlah: 10, harga: 2000 }
       ]);
-      showToast("Template SOAP Jantung diterapkan!");
+      showToast("Template SOAP Poli Jantung (dr. Ahmad Rizki) diterapkan!");
     } else if (type === "kulit") {
       setSoap({
         S: "Pasien mengeluh gatal-gatal dan kemerahan pada lengan dan leher sejak 3 hari, terasa panas dan gatal bertambah saat berkeringat.",
@@ -293,10 +293,10 @@ const fetchPatientInfo = async (rm: string) => {
       });
       setVitals({ td: "120/80", nadi: "78", suhu: "36.6", rr: "18", spo2: "99", bb: "58" });
       setPrescriptions([
-        { nama: "Cetirizine 10mg", dosis: "1x1 Tablet Malam (Sesudah Makan)", jumlah: 10, harga: 12000 },
-        { nama: "Hydrocortisone Cream 1% 5g", dosis: "2x Sehari Dioles Tipis", jumlah: 1, harga: 18000 }
+        { nama: "Cetirizine 10mg", dosis: "1x1 Tablet Malam (Sesudah Makan)", jumlah: 10, harga: 1800 },
+        { nama: "Hydrocortisone Cream 1% (5g)", dosis: "2x Sehari Dioles Tipis", jumlah: 1, harga: 12000 }
       ]);
-      showToast("Template SOAP Kulit diterapkan!");
+      showToast("Template SOAP Poli Kulit (dr. Laila Rahmawati) diterapkan!");
     } else if (type === "demam") {
       setSoap({
         S: "Pasien mengeluh demam tinggi mendadak sejak 3 hari, disertai sakit kepala, nyeri belakang mata, mual, dan pegal seluruh badan.",
@@ -306,8 +306,8 @@ const fetchPatientInfo = async (rm: string) => {
       });
       setVitals({ td: "110/70", nadi: "88", suhu: "38.8", rr: "20", spo2: "98", bb: "60" });
       setPrescriptions([
-        { nama: "Paracetamol 500mg", dosis: "3x1 Tablet (Bila Demam)", jumlah: 10, harga: 10000 },
-        { nama: "Oralit 200ml", dosis: "Sesuai Kebutuhan (Minum Banyak)", jumlah: 10, harga: 15000 }
+        { nama: "Paracetamol 500mg", dosis: "3x1 Tablet (Bila Demam)", jumlah: 10, harga: 1500 },
+        { nama: "Vitamin C 500mg", dosis: "1x1 Tablet (Sesudah Makan)", jumlah: 10, harga: 1000 }
       ]);
       showToast("Template SOAP Demam diterapkan!");
     } else if (type === "mata") {
@@ -315,13 +315,56 @@ const fetchPatientInfo = async (rm: string) => {
         S: "Pasien mengeluh mata kanan merah, berair, perih, dan mengganjal sejak kemarin pagi. Kotoran mata lengket saat bangun tidur.",
         O: "Pemeriksaan Oftalmologis OD: Injeksi konjungtiva (+), sekret seromukopurulen (+), kornea jernih, refleks cahaya (+/+), visus 6/6.",
         A: "Konjungtivitis Bakteri OD (ICD-10: H10.0)",
-        P: "1. Chloramphenicol Tetes Mata 0.5% 4x1-2 tetes pada mata kanan\n2. Edukasi jangan mengucek mata, bersihkan sekret dengan kapas basah, cuci tangan sebelum/sesudah tetes mata."
+        P: "1. Cendo Xitrol Tetes Mata Steril 4x1-2 tetes pada mata kanan\n2. Cendo Eyefresh 3x1 tetes\n3. Edukasi jangan mengucek mata, bersihkan sekret dengan kapas basah, cuci tangan sebelum/sesudah tetes mata."
       });
       setVitals({ td: "120/80", nadi: "76", suhu: "36.5", rr: "16", spo2: "99", bb: "62" });
       setPrescriptions([
-        { nama: "Chloramphenicol Eye Drops 0.5% 5ml", dosis: "4x2 Tetes Mata Kanan", jumlah: 1, harga: 22000 }
+        { nama: "Cendo Xitrol Tetes Mata Steril (5ml)", dosis: "4x2 Tetes Mata Kanan", jumlah: 1, harga: 38000 },
+        { nama: "Cendo Eyefresh / Insto Tetes Mata (15ml)", dosis: "3x1 Tetes Mata (Bila Kering)", jumlah: 1, harga: 18000 }
       ]);
-      showToast("Template SOAP Mata diterapkan!");
+      showToast("Template SOAP Poli Mata (dr. Hendra Kusuma) diterapkan!");
+    } else if (type === "penyakit-dalam") {
+      setSoap({
+        S: "Pasien mengeluh nyeri ulu hati terasa terbakar (heartburn), mual, perut kembung, dan badan lemas sejak 1 minggu. Riwayat Diabetes Mellitus Tipe 2 dan Asam Lambung.",
+        O: "TD: 130/80 mmHg, Nadi: 82 x/menit, Suhu: 36.6°C, Gula Darah Puasa: 145 mg/dL. Nyeri tekan epigastrium (+), peristaltik usus normal.",
+        A: "Dispepsia Organik / GERD & Diabetes Mellitus Tipe 2 (ICD-10: K30 & E11.9)",
+        P: "1. Lansoprazole 30mg 1x1 kapsul (sebelum makan pagi)\n2. Metformin 500mg 2x1 tablet (sesudah makan)\n3. Sukralfat Sirup 3x1 sendok takar (sebelum makan)\n4. Edukasi pola makan teratur dan kurangi makanan pedas/asam."
+      });
+      setVitals({ td: "130/80", nadi: "82", suhu: "36.6", rr: "18", spo2: "98", bb: "68" });
+      setPrescriptions([
+        { nama: "Metformin 500mg", dosis: "2x1 Tablet (Sesudah Makan)", jumlah: 30, harga: 1800 },
+        { nama: "Lansoprazole 30mg", dosis: "1x1 Kapsul Pagi (Sebelum Makan)", jumlah: 14, harga: 4500 },
+        { nama: "Sukralfat Sirup Maag 500mg/5ml (100ml)", dosis: "3x1 Sendok Takar (Sebelum Makan)", jumlah: 1, harga: 38000 }
+      ]);
+      showToast("Template SOAP Poli Penyakit Dalam (dr. Bagus W.) diterapkan!");
+    } else if (type === "anak") {
+      setSoap({
+        S: "Anak (umur 4 tahun) mengeluh batuk berdahak, pilek hidung tersumbat, dan demam naik turun sejak 2 hari. Nafsu makan menurun tetapi masih mau minum.",
+        O: "BB: 15 kg, Suhu: 38.2°C, Nadi: 104 x/menit, RR: 24 x/menit. Pharynx hiperemis (+), tonsil T1-T1, auskultasi paru vesikuler (+/+), ronkhi (-), wheezing (-).",
+        A: "Infeksi Saluran Pernapasan Akut / ISPA pada Anak (ICD-10: J06.9)",
+        P: "1. Sanmol Sirup Anak 120mg/5ml 3x1 sendok takar (bila demam >38°C)\n2. Rhinos Neo Drops 3x0.8ml (bila flu/tersumbat)\n3. Zinc Sirup 1x1 sendok takar\n4. Edukasi istirahat cukup dan perbanyak asupan cairan hangat."
+      });
+      setVitals({ td: "100/65", nadi: "104", suhu: "38.2", rr: "24", spo2: "99", bb: "15" });
+      setPrescriptions([
+        { nama: "Sanmol Sirup Anak 120mg/5ml (60ml)", dosis: "3x1 Sendok Takar (Bila Demam)", jumlah: 1, harga: 18000 },
+        { nama: "Rhinos Neo Drops Flu Anak (10ml)", dosis: "3x0.8ml Tetes Hidung/Oral", jumlah: 1, harga: 65000 },
+        { nama: "Zinc Sirup Diare 20mg/5ml (60ml)", dosis: "1x1 Sendok Takar", jumlah: 1, harga: 22000 }
+      ]);
+      showToast("Template SOAP Poli Anak (dr. Rudi Setiawan) diterapkan!");
+    } else if (type === "umum") {
+      setSoap({
+        S: "Pasien mengeluh badan pegal-pegal, pusing berputar ringan, batuk kering, dan tenggorokan gatal setelah terpapar hujan 2 hari lalu.",
+        O: "TD: 120/80 mmHg, Nadi: 80 x/menit, Suhu: 37.2°C, RR: 18 x/menit, SpO2: 99%. Pharynx sedikit hiperemis, paru vesikuler (+/+).",
+        A: "Common Cold / Influenza (ICD-10: J00)",
+        P: "1. Paracetamol 500mg 3x1 tablet\n2. Cetirizine 10mg 1x1 tablet (malam hari)\n3. Vitamin C 500mg 1x1 tablet\n4. Edukasi istirahat cukup & minum air hangat."
+      });
+      setVitals({ td: "120/80", nadi: "80", suhu: "37.2", rr: "18", spo2: "99", bb: "62" });
+      setPrescriptions([
+        { nama: "Paracetamol 500mg", dosis: "3x1 Tablet (Bila Sakit/Pegal)", jumlah: 10, harga: 1500 },
+        { nama: "Cetirizine 10mg", dosis: "1x1 Tablet Malam (Sesudah Makan)", jumlah: 10, harga: 1800 },
+        { nama: "Vitamin C 500mg", dosis: "1x1 Tablet (Sesudah Makan)", jumlah: 10, harga: 1000 }
+      ]);
+      showToast("Template SOAP Poli Umum (dr. Maya Lestari) diterapkan!");
     }
   };
 
@@ -662,21 +705,30 @@ const fetchPatientInfo = async (rm: string) => {
 
               {/* Template Buttons */}
               <div style={{ background: "#f8fafc", padding: "12px 16px", borderRadius: 12, border: "1px solid #e2e8f0", marginBottom: 20, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 11.5, fontWeight: 800, color: "#475569" }}>⚡ Quick Template SOAP:</span>
-                <button onClick={() => applySoapTemplate("gigi")} style={{ background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
-                  🦷 Poli Gigi
+                <span style={{ fontSize: 11.5, fontWeight: 800, color: "#475569" }}>⚡ Quick Template SOAP Dokter:</span>
+                <button type="button" onClick={() => applySoapTemplate("umum")} style={{ background: "#ccfbf1", color: "#0f766e", border: "1px solid #99f6e4", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  🩺 Poli Umum (dr. Maya)
                 </button>
-                <button onClick={() => applySoapTemplate("jantung")} style={{ background: "#fff1f2", color: "#be123c", border: "1px solid #ffe4e6", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
-                  ❤️ Jantung
+                <button type="button" onClick={() => applySoapTemplate("gigi")} style={{ background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  🦷 Poli Gigi (drg. Sari)
                 </button>
-                <button onClick={() => applySoapTemplate("kulit")} style={{ background: "#fff7ed", color: "#c2410c", border: "1px solid #ffedd5", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
-                  🧴 Kulit / Dermatologi
+                <button type="button" onClick={() => applySoapTemplate("jantung")} style={{ background: "#fff1f2", color: "#be123c", border: "1px solid #ffe4e6", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  ❤️ Poli Jantung (dr. Rizki)
                 </button>
-                <button onClick={() => applySoapTemplate("demam")} style={{ background: "#e0f2fe", color: "#0369a1", border: "1px solid #bae6fd", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
-                  🌡️ Demam
+                <button type="button" onClick={() => applySoapTemplate("kulit")} style={{ background: "#fce7f3", color: "#be185d", border: "1px solid #fbcfe8", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  🧴 Poli Kulit (dr. Laila)
                 </button>
-                <button onClick={() => applySoapTemplate("mata")} style={{ background: "#f0fdf4", color: "#15803d", border: "1px solid #dcfce7", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
-                  👁️ Mata / Oftalmologi
+                <button type="button" onClick={() => applySoapTemplate("anak")} style={{ background: "#f0fdf4", color: "#15803d", border: "1px solid #dcfce7", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  👶 Poli Anak (dr. Rudi)
+                </button>
+                <button type="button" onClick={() => applySoapTemplate("mata")} style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  👁️ Poli Mata (dr. Hendra)
+                </button>
+                <button type="button" onClick={() => applySoapTemplate("penyakit-dalam")} style={{ background: "#e0f2fe", color: "#0369a1", border: "1px solid #bae6fd", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  🩺 Penyakit Dalam (dr. Bagus)
+                </button>
+                <button type="button" onClick={() => applySoapTemplate("demam")} style={{ background: "#fff7ed", color: "#c2410c", border: "1px solid #ffedd5", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  🌡️ Demam & ISPA
                 </button>
               </div>
 

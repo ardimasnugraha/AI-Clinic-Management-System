@@ -107,9 +107,17 @@ const fetchPatientInfo = async (rm: string) => {
   // Prescriptions List
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
 
+  // Diagnosis & Tindakan State
+  const [icdCodeInput, setIcdCodeInput] = useState("");
+  const [icdNameInput, setIcdNameInput] = useState("");
+  const [procedures, setProcedures] = useState<Array<{ name: string; cost: number }>>([]);
+  const [newProcName, setNewProcName] = useState("");
+  const [newProcCost, setNewProcCost] = useState(50000);
+
   // Lab Order State
-  const [requestLabTest, setRequestLabTest] = useState(false);
   const [labTestName, setLabTestName] = useState("Darah Lengkap & Hb");
+  const [labNotes, setLabNotes] = useState("");
+  const [patientLabOrders, setPatientLabOrders] = useState<any[]>([]);
 
   const [newMed, setNewMed] = useState({ nama: "Paracetamol 500mg", dosis: "3x1 sesudah makan", jumlah: 10, harga: 10000 });
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -221,6 +229,105 @@ const fetchPatientInfo = async (rm: string) => {
       if (onClearInitialPatient) onClearInitialPatient();
     }
   }, [initialPatient, onClearInitialPatient]);
+
+  const loadPatientLabOrders = async (rm: string) => {
+    if (!rm || rm === "-") return;
+    try {
+      const { data, error } = await supabase
+        .from("lab_orders")
+        .select("*")
+        .eq("patient_rm", rm)
+        .order("created_at", { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        setPatientLabOrders(data);
+        return;
+      }
+    } catch (e) {}
+
+    try {
+      const cached = localStorage.getItem("clinic_lab_orders_v1");
+      if (cached) {
+        const list = JSON.parse(cached);
+        const filtered = list.filter((l: any) => l.patient_rm === rm || l.patientRm === rm);
+        setPatientLabOrders(filtered);
+      } else {
+        setPatientLabOrders([]);
+      }
+    } catch (e) {
+      setPatientLabOrders([]);
+    }
+  };
+
+  useEffect(() => {
+    if (activePatient.rm && activePatient.rm !== "-") {
+      loadPatientLabOrders(activePatient.rm);
+    }
+  }, [activePatient.rm]);
+
+  const handleAddProcedure = (customProc?: { name: string; cost: number }) => {
+    const procToAdd = customProc || { name: newProcName, cost: Number(newProcCost) || 50000 };
+    if (!procToAdd.name.trim()) {
+      alert("Nama Tindakan wajib diisi.");
+      return;
+    }
+    setProcedures(prev => [...prev, procToAdd]);
+    if (!customProc) {
+      setNewProcName("");
+      setNewProcCost(50000);
+    }
+    showToast(`Tindakan "${procToAdd.name}" ditambahkan!`);
+  };
+
+  const handleRemoveProcedure = (idx: number) => {
+    setProcedures(procedures.filter((_, i) => i !== idx));
+  };
+
+  const handleAddDiagnosis = (code: string, name: string) => {
+    const fullDiag = `${name} (ICD-10: ${code})`;
+    setSoap(prev => {
+      const existingA = prev.A.trim();
+      const updatedA = existingA ? `${existingA} / ${fullDiag}` : fullDiag;
+      return { ...prev, A: updatedA };
+    });
+    setIcdCodeInput("");
+    setIcdNameInput("");
+    showToast(`Diagnosis "${fullDiag}" ditambahkan ke Assessment (A)!`);
+  };
+
+  const handleSendLabOrder = async () => {
+    if (!activePatient.name || activePatient.name === "Pilih Pasien Dari Antrean / Daftar") {
+      alert("Harap pilih Pasien terlebih dahulu.");
+      return;
+    }
+    const labNo = `LAB-${Math.floor(1000 + Math.random() * 9000)}`;
+    const newOrder = {
+      clinic_id: "11111111-1111-1111-1111-111111111111",
+      lab_no: labNo,
+      patient_rm: activePatient.rm,
+      patient_name: activePatient.name,
+      doctor_name: activePatient.doctor,
+      test_name: labTestName,
+      date: new Date().toISOString().split("T")[0],
+      status: "menunggu",
+      notes: labNotes || "Order dari Encounter Dokter",
+      created_at: new Date().toISOString()
+    };
+
+    try {
+      await supabase.from("lab_orders").insert([newOrder]);
+    } catch (e) {}
+
+    try {
+      const cached = localStorage.getItem("clinic_lab_orders_v1");
+      const list = cached ? JSON.parse(cached) : [];
+      localStorage.setItem("clinic_lab_orders_v1", JSON.stringify([newOrder, ...list]));
+    } catch (e) {}
+
+    setPatientLabOrders(prev => [newOrder, ...prev]);
+    setLabNotes("");
+    showToast(`Order Lab "${labTestName}" berhasil dikirim ke modul Laboratorium!`);
+  };
 
   const handleSelectPatientAny = async (rmOrName: string) => {
     if (!rmOrName) return;
@@ -558,14 +665,8 @@ const fetchPatientInfo = async (rm: string) => {
     } catch (e) {}
 
     // 3. Auto Order Lab if requested
-    if (requestLabTest) {
-      addLabOrderFromEncounter({
-        patientRm: activePatient.rm,
-        patientName: activePatient.name,
-        doctorName: activePatient.doctor,
-        testName: labTestName,
-        notes: `Order dari Encounter ${encounterId}`
-      });
+    if (patientLabOrders.length > 0) {
+      // Lab orders already inserted into lab_orders table & state via handleSendLabOrder
     }
 
     // 4. Auto-Complete Status in Queue and Appointment Store!
@@ -580,7 +681,7 @@ const fetchPatientInfo = async (rm: string) => {
       patientName: activePatient.name,
       totalAmount,
       prescriptionsCount: prescriptions.length,
-      hasLab: requestLabTest
+      hasLab: patientLabOrders.length > 0
     });
   };
 
@@ -869,37 +970,254 @@ const fetchPatientInfo = async (rm: string) => {
             </Container>
           )}
 
-          {/* TAB: LABORATORIUM ORDER */}
+          {/* TAB: DIAGNOSIS & TINDAKAN */}
+          {activeTab === "Diagnosis & Tindakan" && (
+            <Container style={{ padding: 24 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", margin: "0 0 16px" }}>Diagnosis Medis (ICD-10) & Tindakan Klinik</h3>
+              
+              {/* Quick Select Diagnosis ICD-10 */}
+              <div style={{ background: "#f0fdf4", padding: 16, borderRadius: 14, border: "1px solid #bbf7d0", marginBottom: 20 }}>
+                <span style={{ fontSize: 12, fontWeight: 800, color: "#166534", display: "block", marginBottom: 10 }}>
+                  ⚡ Katalog Diagnosis ICD-10 Cepat (Klik 1x untuk menambahkan ke Catatan Assessment):
+                </span>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {[
+                    { code: "J00", name: "Common Cold / Influenza (Flu)" },
+                    { code: "K04.0", name: "Pulpitis Akut / Karies Gigi" },
+                    { code: "I20.0", name: "Angina Pektoris Unstable" },
+                    { code: "L23.9", name: "Dermatitis Kontak Alergi" },
+                    { code: "K30", name: "Dispepsia Organik / GERD" },
+                    { code: "E11.9", name: "Diabetes Mellitus Tipe 2" },
+                    { code: "A90", name: "Demam Dengue (Dengue Fever)" },
+                    { code: "H10.0", name: "Konjungtivitis Bakteri OD" },
+                    { code: "J06.9", name: "ISPA Akut pada Anak" },
+                  ].map((d) => (
+                    <button
+                      key={d.code}
+                      type="button"
+                      onClick={() => handleAddDiagnosis(d.code, d.name)}
+                      style={{ background: "#fff", color: "#15803d", border: "1px solid #86efac", borderRadius: 8, padding: "6px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                      + [{d.code}] {d.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Input Diagnosis ICD-10 */}
+              <div style={{ background: "#f8fafc", padding: 16, borderRadius: 14, border: "1.5px solid #e2e8f0", marginBottom: 24, display: "flex", flexDirection: "column", gap: 12 }}>
+                <h4 style={{ fontSize: 13, fontWeight: 800, color: "#0f172a", margin: 0 }}>+ Tambah Diagnosis ICD-10 Custom</h4>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr 120px", gap: 10 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 4 }}>Kode ICD-10</label>
+                    <input
+                      type="text"
+                      placeholder="Misal: J01.0"
+                      value={icdCodeInput}
+                      onChange={e => setIcdCodeInput(e.target.value)}
+                      style={{ width: "100%", padding: "8.5px 12px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: 12.5, outline: "none" }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 4 }}>Nama Diagnosis</label>
+                    <input
+                      type="text"
+                      placeholder="Misal: Sinusitis Maksilaris Akut"
+                      value={icdNameInput}
+                      onChange={e => setIcdNameInput(e.target.value)}
+                      style={{ width: "100%", padding: "8.5px 12px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: 12.5, outline: "none" }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", alignItems: "flex-end" }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!icdCodeInput.trim() || !icdNameInput.trim()) {
+                          alert("Kode ICD-10 dan Nama Diagnosis wajib diisi.");
+                          return;
+                        }
+                        handleAddDiagnosis(icdCodeInput, icdNameInput);
+                      }}
+                      style={{ width: "100%", background: "#0d9488", color: "#fff", border: "none", borderRadius: 8, padding: "9px 0", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                      + Tambah
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Prosedur & Tindakan Medis */}
+              <h4 style={{ fontSize: 14, fontWeight: 800, color: "#0f172a", margin: "0 0 12px" }}>Tindakan & Prosedur Medis Klinik</h4>
+              
+              {/* Quick Select Procedures */}
+              <div style={{ background: "#eff6ff", padding: 14, borderRadius: 12, border: "1px solid #bfdbfe", marginBottom: 16 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 800, color: "#1e40af", display: "block", marginBottom: 8 }}>
+                  ⚡ Pilih Tindakan Klinik Cepat (Klik 1x):
+                </span>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {[
+                    { name: "Konsultasi & Pemeriksaan Dokter", cost: 50000 },
+                    { name: "Penambalan Gigi / Tooth Filling", cost: 150000 },
+                    { name: "Rekam Jantung EKG 12-Lead", cost: 100000 },
+                    { name: "Rawat Luka & Timbang Kasa", cost: 45000 },
+                    { name: "Nebulizer / Terapi Uap Anak", cost: 60000 },
+                    { name: "Irigasi & Pembersihan Mata Steril", cost: 55000 },
+                    { name: "Pemeriksaan Gula Darah & Kolesterol Stik", cost: 35000 }
+                  ].map((p, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleAddProcedure(p)}
+                      style={{ background: "#fff", color: "#1d4ed8", border: "1px solid #93c5fd", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                      + {p.name} (Rp {p.cost.toLocaleString("id-ID")})
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Procedure Input */}
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 120px", gap: 10, marginBottom: 20 }}>
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Nama Tindakan Medis / Prosedur Custom..."
+                    value={newProcName}
+                    onChange={e => setNewProcName(e.target.value)}
+                    style={{ width: "100%", padding: "8.5px 12px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: 12.5, outline: "none" }}
+                  />
+                </div>
+                <div>
+                  <input
+                    type="number"
+                    placeholder="Biaya (Rp)"
+                    value={newProcCost}
+                    onChange={e => setNewProcCost(Number(e.target.value))}
+                    style={{ width: "100%", padding: "8.5px 12px", borderRadius: 8, border: "1.5px solid #cbd5e1", fontSize: 12.5, outline: "none" }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleAddProcedure()}
+                  style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 8, padding: "8.5px 0", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                  + Tambah
+                </button>
+              </div>
+
+              {/* List of Added Procedures */}
+              {procedures.length === 0 ? (
+                <div style={{ padding: 20, textAlign: "center", background: "#f8fafc", borderRadius: 12, border: "1px dashed #cbd5e1" }}>
+                  <p style={{ fontSize: 12.5, color: "#64748b", margin: 0, fontWeight: 700 }}>Belum ada tindakan medis khusus ditambahkan.</p>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: "#475569" }}>Daftar Tindakan Ditambahkan ({procedures.length}):</span>
+                  {procedures.map((p, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 10, border: "1px solid #e2e8f0", background: "#fff" }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{p.name}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <span style={{ fontSize: 13, fontWeight: 800, color: "#0d9488" }}>Rp {p.cost.toLocaleString("id-ID")}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveProcedure(i)}
+                          style={{ border: "none", background: "#fef2f2", color: "#dc2626", borderRadius: 6, padding: "4px 8px", fontWeight: 800, cursor: "pointer" }}>
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Container>
+          )}
+
+          {/* TAB: LABORATORIUM */}
           {activeTab === "Laboratorium" && (
             <Container style={{ padding: 24 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", margin: "0 0 16px" }}>Permintaan Tes Laboratorium</h3>
-              <div style={{ background: "#f8fafc", padding: 18, borderRadius: 14, border: "1.5px solid #e2e8f0", display: "flex", flexDirection: "column", gap: 14 }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 13, fontWeight: 800, color: "#0f172a" }}>
-                  <input 
-                    type="checkbox" 
-                    checked={requestLabTest} 
-                    onChange={e => setRequestLabTest(e.target.checked)}
-                    style={{ width: 18, height: 18, accentColor: "#0d9488" }} 
-                  />
-                  <span>Minta Pemeriksaan Tes Laboratorium untuk Pasien Ini</span>
-                </label>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", margin: 0 }}>Order Pemeriksaan Laboratorium Pasien</h3>
+                  <p style={{ fontSize: 12, color: "#64748b", margin: "2px 0 0" }}>
+                    Pasien: <strong>{activePatient.name}</strong> ({activePatient.rm})
+                  </p>
+                </div>
+              </div>
 
-                {requestLabTest && (
+              {/* Form Order Lab */}
+              <div style={{ background: "#f8fafc", padding: 18, borderRadius: 14, border: "1.5px solid #e2e8f0", marginBottom: 24, display: "flex", flexDirection: "column", gap: 14 }}>
+                <h4 style={{ fontSize: 13.5, fontWeight: 800, color: "#0f172a", margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+                  <FlaskConical style={{ width: 18, height: 18, color: "#0d9488" }} />
+                  + Buat Permintaan Tes Lab Baru
+                </h4>
+                
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 6 }}>Jenis Pemeriksaan Lab yang Diminta:</label>
+                    <label style={{ fontSize: 11.5, fontWeight: 700, color: "#374151", display: "block", marginBottom: 6 }}>Pilih Jenis Pemeriksaan Lab:</label>
                     <select 
                       value={labTestName} 
                       onChange={e => setLabTestName(e.target.value)}
                       style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #cbd5e1", fontSize: 13, outline: "none", fontWeight: 700 }}>
-                      <option value="Darah Lengkap & Hb">Darah Lengkap & Hb</option>
+                      <option value="Darah Lengkap & Hb">Darah Lengkap & Hb (Hematologi)</option>
                       <option value="Gula Darah Puasa (GDP)">Gula Darah Puasa (GDP)</option>
-                      <option value="Profil Lipid (Kolesterol Total)">Profil Lipid (Kolesterol Total)</option>
-                      <option value="Fungsi Ginjal (Ureum/Kreatinin)">Fungsi Ginjal (Ureum/Kreatinin)</option>
+                      <option value="Gula Darah Sewaktu (GDS)">Gula Darah Sewaktu (GDS)</option>
+                      <option value="Profil Lipid (Kolesterol Total & Trigliserida)">Profil Lipid (Kolesterol Total)</option>
+                      <option value="Fungsi Ginjal (Ureum & Kreatinin)">Fungsi Ginjal (Ureum/Kreatinin)</option>
+                      <option value="Tes Fungsi Hati (SGOT & SGPT)">Tes Fungsi Hati (SGOT/SGPT)</option>
                       <option value="Urinalisis Lengkap">Urinalisis Lengkap</option>
+                      <option value="Tes Widal & Serologi Dengue">Tes Widal & Dengue NS1</option>
                     </select>
                   </div>
-                )}
+                  <div>
+                    <label style={{ fontSize: 11.5, fontWeight: 700, color: "#374151", display: "block", marginBottom: 6 }}>Catatan / Indikasi Klinis Dokter:</label>
+                    <input
+                      type="text"
+                      placeholder="Misal: Demam 3 hari / Suspect Dengue..."
+                      value={labNotes}
+                      onChange={e => setLabNotes(e.target.value)}
+                      style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #cbd5e1", fontSize: 13, outline: "none" }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button 
+                    type="button"
+                    onClick={handleSendLabOrder}
+                    style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 12.5, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, boxShadow: "0 2px 8px rgba(13,148,136,0.3)" }}>
+                    <FlaskConical style={{ width: 16, height: 16 }} />
+                    + Kirim Order Ke Laboratorium
+                  </button>
+                </div>
               </div>
+
+              {/* Status Order Lab Pasien */}
+              <h4 style={{ fontSize: 14, fontWeight: 800, color: "#0f172a", margin: "0 0 12px" }}>Riwayat Order Lab Pasien Ini</h4>
+              {patientLabOrders.length === 0 ? (
+                <div style={{ padding: 24, textAlign: "center", background: "#f8fafc", borderRadius: 12, border: "1px dashed #cbd5e1" }}>
+                  <FlaskConical style={{ width: 32, height: 32, color: "#94a3b8", margin: "0 auto 8px" }} />
+                  <p style={{ fontSize: 13, color: "#64748b", fontWeight: 700, margin: 0 }}>Belum ada order tes laboratorium untuk pasien ini.</p>
+                  <p style={{ fontSize: 11.5, color: "#94a3b8", margin: "4px 0 0" }}>Gunakan form di atas untuk mengirimkan permintaan tes lab baru.</p>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {patientLabOrders.map((o, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderRadius: 12, border: "1px solid #e2e8f0", background: "#fff" }}>
+                      <div>
+                        <div style={{ fontSize: 13.5, fontWeight: 800, color: "#0f172a" }}>{o.test_name || o.testName}</div>
+                        <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 2 }}>
+                          No. Lab: <strong>{o.lab_no || o.labNo || o.id}</strong> • Dokter: {o.doctor_name || o.doctorName} • Catatan: {o.notes || "-"}
+                        </div>
+                      </div>
+                      <div>
+                        <span style={{ 
+                          padding: "4px 12px", borderRadius: 20, fontSize: 11.5, fontWeight: 800,
+                          background: o.status === "selesai" ? "#dcfce7" : o.status === "proses" ? "#dbeafe" : o.status === "abnormal" ? "#fef2f2" : "#fff7ed",
+                          color: o.status === "selesai" ? "#15803d" : o.status === "proses" ? "#1d4ed8" : o.status === "abnormal" ? "#dc2626" : "#c2410c"
+                        }}>
+                          {o.status === "selesai" ? "✓ Selesai" : o.status === "proses" ? "🔄 Dalam Proses" : o.status === "abnormal" ? "⚠ Abnormal" : "⏳ Menunggu Lab"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Container>
           )}
 
@@ -1067,12 +1385,7 @@ const fetchPatientInfo = async (rm: string) => {
             </Container>
           )}
 
-          {!["SOAP Note", "Anamnesis & Vital Sign", "Resep Obat", "Laboratorium"].includes(activeTab) && (
-            <Container style={{ padding: 40, textAlign: "center" }}>
-              <FileText style={{ width: 40, height: 40, color: "#94a3b8", margin: "0 auto 12px" }} />
-              <p style={{ fontSize: 14, color: "#64748b", fontWeight: 700 }}>Modul {activeTab} aktif dan dapat digunakan.</p>
-            </Container>
-          )}
+
 
           {/* Step-by-Step Action Navigation Buttons */}
           <div style={{ display: "flex", gap: 12, marginTop: 20, alignItems: "center", flexWrap: "wrap" }}>

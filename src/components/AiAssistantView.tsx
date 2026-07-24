@@ -311,7 +311,7 @@ export default function AiAssistantView() {
       };
       setMessages((prev) => [...prev, aiMsg]);
     } catch (err: any) {
-      const fallbackResponse = `⚠️ **Peringatan Sistem**: ${err.message || 'Terjadi kesalahan'}\n\nSilakan periksa kembali API Key Anda (di bagian 'Koneksi Asisten AI Medis' di atas). Masukkan kunci asli Anda yang diawali dengan 'gsk_...'.`;
+      const fallbackResponse = `⚠️ **Peringatan Sistem**: ${err.message || 'Terjadi kesalahan'}\n\nSilakan hubungi administrator klinik jika terjadi masalah pada koneksi AI Medis.`;
       
       const aiMsg: Message = {
         sender: "ai",
@@ -358,77 +358,7 @@ export default function AiAssistantView() {
         </div>
       </div>
 
-      {/* Google AI Studio API Key Configuration Row */}
-      <div style={{
-        background: "#fff",
-        border: "1px solid #e2e8f0",
-        borderRadius: 16,
-        padding: "14px 20px",
-        boxShadow: "0 4px 12px rgba(0,0,0,0.02)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 16,
-        flexWrap: "wrap"
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: "#f3e8ff", display: "flex", alignItems: "center", justifyContent: "center", color: "#a855f7" }}>
-            <Key style={{ width: 18, height: 18 }} />
-          </div>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>Koneksi Asisten AI Medis</div>
-            <div style={{ fontSize: 11, color: "#64748b" }}>
-              {apiKey.trim().startsWith("gsk_")
-                ? "Terhubung ke Groq Cloud (LLaMA 3 Engine). Respon sangat cepat dan akurat."
-                : "Engine AI Klinis Internal Aktif. Masukkan Kunci Groq (gsk_...) jika ingin model cloud."
-              }
-            </div>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => {
-              setApiKey(e.target.value);
-              localStorage.setItem("groq_api_key_v1", e.target.value);
-            }}
-            placeholder="Masukkan Groq API Key (gsk_...)"
-            style={{
-              width: 280,
-              padding: "9px 14px",
-              borderRadius: 10,
-              border: "1.5px solid #cbd5e1",
-              fontSize: 12.5,
-              outline: "none",
-              transition: "all 0.15s"
-            }}
-          />
-          {apiKey && (
-            <button
-              type="button"
-              onClick={() => {
-                localStorage.removeItem("groq_api_key_v1");
-                const envKey = process.env.NEXT_PUBLIC_GROQ_API_KEY || "";
-                setApiKey(envKey);
-              }}
-              style={{
-                padding: "8px 12px",
-                borderRadius: 10,
-                border: "1.5px solid #cbd5e1",
-                background: "#f8fafc",
-                color: "#475569",
-                fontSize: 11.5,
-                fontWeight: 700,
-                cursor: "pointer"
-              }}
-              title="Reset ke kunci dari file .env.local"
-            >
-              Reset Key
-            </button>
-          )}
-        </div>
-      </div>
+
 
       {/* Main Content Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 24, alignItems: "start" }}>

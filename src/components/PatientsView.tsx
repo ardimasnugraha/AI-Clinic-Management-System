@@ -68,10 +68,11 @@ export default function PatientsView({ onMakeAppointment, onStartEncounter }: Pa
   });
 
   // AI Duplicate Check State
-  const [duplicateCheck, setDuplicateCheck] = useState<{ match: boolean; score: number; matchPatient: PatientItem | null }>({
-    match: true,
-    score: 78,
-    matchPatient: null
+  const [duplicateCheck, setDuplicateCheck] = useState<{ match: boolean; score: number; matchPatient: PatientItem | null; hasInput: boolean }>({
+    match: false,
+    score: 0,
+    matchPatient: null,
+    hasInput: false
   });
 
   // Toast Notification
@@ -82,7 +83,7 @@ export default function PatientsView({ onMakeAppointment, onStartEncounter }: Pa
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Fetch Patients from Supabase & LocalStorage
+  // Fetch Patients from Supabase & LocalStorage + Real-time Subscription
   useEffect(() => {
     async function loadPatients() {
       let mapped: PatientItem[] = [];
@@ -135,25 +136,121 @@ export default function PatientsView({ onMakeAppointment, onStartEncounter }: Pa
       setPatients(mapped);
       if (mapped.length > 0) setSelectedPatient(mapped[0]);
     }
+
     loadPatients();
+
+    // Real-time listener on Supabase patients table
+    let channel: any = null;
+    if (isConfigured) {
+      channel = supabase
+        .channel("realtime-patients-duplicate")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "patients" },
+          () => {
+            loadPatients();
+          }
+        )
+        .subscribe();
+    }
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, []);
 
-  // Real-time AI Duplicate detection as user types NIK or Name
+  // Real-time AI Duplicate detection algorithm against Supabase & state patient list
   useEffect(() => {
-    if (newPatient.name.trim().length > 2 || newPatient.nik.trim().length > 3) {
-      const match = patients.find(p => 
-        p.name.toLowerCase().includes(newPatient.name.toLowerCase()) || 
-        (newPatient.nik && p.nik.includes(newPatient.nik))
-      );
-      if (match) {
-        setDuplicateCheck({ match: true, score: 88, matchPatient: match });
-      } else {
-        setDuplicateCheck({ match: false, score: 0, matchPatient: null });
-      }
-    } else {
-      setDuplicateCheck({ match: true, score: 78, matchPatient: patients[0] });
+    const hasName = newPatient.name.trim().length >= 2;
+    const hasNik = newPatient.nik.trim().length >= 3;
+    const hasPhone = newPatient.phone.trim().length >= 3;
+    const hasDob = !!newPatient.dob;
+
+    if (!hasName && !hasNik && !hasPhone && !hasDob) {
+      setDuplicateCheck({ match: false, score: 0, matchPatient: null, hasInput: false });
+      return;
     }
-  }, [newPatient.name, newPatient.nik, patients]);
+
+    let highestScore = 0;
+    let bestMatch: PatientItem | null = null;
+
+    const inputName = newPatient.name.trim().toLowerCase();
+    const cleanInputNik = newPatient.nik.replace(/\D/g, "");
+    const cleanInputPhone = newPatient.phone.replace(/\D/g, "");
+
+    for (const p of patients) {
+      let score = 0;
+
+      const cleanPNik = p.nik.replace(/\D/g, "");
+      const cleanPPhone = p.phone.replace(/\D/g, "");
+      const pName = p.name.trim().toLowerCase();
+
+      // 1. NIK Match
+      if (cleanInputNik.length >= 4 && cleanPNik.length >= 4) {
+        if (cleanInputNik === cleanPNik) {
+          score = 100; // Exact NIK match -> 100% duplicate
+        } else if (cleanPNik.includes(cleanInputNik) || cleanInputNik.includes(cleanPNik)) {
+          score = Math.max(score, 85);
+        }
+      }
+
+      // 2. Phone Match
+      if (cleanInputPhone.length >= 6 && cleanPPhone.length >= 6) {
+        if (cleanInputPhone === cleanPPhone) {
+          score = Math.max(score, 90);
+        } else if (cleanPPhone.endsWith(cleanInputPhone.slice(-8)) || cleanInputPhone.endsWith(cleanPPhone.slice(-8))) {
+          score = Math.max(score, 75);
+        }
+      }
+
+      // 3. Name Similarity
+      if (hasName) {
+        if (pName === inputName) {
+          score = Math.max(score, 95);
+        } else if (pName.includes(inputName) || inputName.includes(pName)) {
+          const ratio = Math.min(inputName.length, pName.length) / Math.max(inputName.length, pName.length);
+          const nameScore = Math.round(70 + ratio * 25);
+          score = Math.max(score, nameScore);
+        } else {
+          // Token overlap
+          const inputTokens = inputName.split(/\s+/).filter(t => t.length > 1);
+          const pTokens = pName.split(/\s+/).filter(t => t.length > 1);
+          if (inputTokens.length > 0 && pTokens.length > 0) {
+            let matchedTokens = 0;
+            inputTokens.forEach(it => {
+              if (pTokens.some(pt => pt.includes(it) || it.includes(pt))) {
+                matchedTokens++;
+              }
+            });
+            if (matchedTokens > 0) {
+              const tokenScore = Math.round((matchedTokens / Math.max(inputTokens.length, pTokens.length)) * 80);
+              score = Math.max(score, tokenScore);
+            }
+          }
+        }
+      }
+
+      // 4. DOB Boost
+      if (hasDob && p.dob && p.dob !== "-") {
+        if (p.dob.includes(newPatient.dob) || newPatient.dob.includes(p.dob)) {
+          score = score > 0 ? Math.min(100, score + 15) : 60;
+        }
+      }
+
+      if (score > highestScore) {
+        highestScore = score;
+        bestMatch = p;
+      }
+    }
+
+    if (highestScore >= 35 && bestMatch) {
+      setDuplicateCheck({ match: true, score: highestScore, matchPatient: bestMatch, hasInput: true });
+    } else {
+      setDuplicateCheck({ match: false, score: highestScore, matchPatient: null, hasInput: true });
+    }
+  }, [newPatient.name, newPatient.nik, newPatient.phone, newPatient.dob, patients]);
 
   // Filter Patients
   const filteredPatients = patients.filter(p => {
@@ -740,52 +837,71 @@ export default function PatientsView({ onMakeAppointment, onStartEncounter }: Pa
           </form>
         </div>
 
-        {/* AI DETEKSI DUPILKASI PASIEN BETA */}
+        {/* AI DETEKSI DUPILKASI PASIEN */}
         <div style={{ background: "linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)", borderRadius: 20, border: "1px solid #e9d5ff", padding: 22, boxShadow: "0 2px 10px rgba(139,92,246,0.05)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
             <Sparkles style={{ width: 18, height: 18, color: "#8b5cf6" }} />
             <h3 style={{ fontSize: 15, fontWeight: 900, color: "#581c87", margin: 0 }}>AI Deteksi Duplikasi Pasien</h3>
-            <span style={{ background: "#c084fc", color: "#fff", padding: "2px 8px", borderRadius: 10, fontSize: 9.5, fontWeight: 800 }}>Beta</span>
           </div>
 
           <p style={{ fontSize: 11.5, color: "#6b21a8", lineHeight: 1.4, marginBottom: 16 }}>
-            Sistem AI menganalisis kemiripan data untuk mencegah duplikasi pasien.
+            Sistem AI menganalisis kemiripan NIK, nama, tanggal lahir, dan kontak secara real-time dengan database Supabase untuk mencegah duplikasi pasien.
           </p>
 
-          {duplicateCheck.match ? (
+          {!duplicateCheck.hasInput ? (
+            <div style={{ background: "#fff", borderRadius: 16, padding: 18, border: "1px solid #f3e8ff", textAlign: "center", color: "#6b21a8" }}>
+              <div style={{ fontSize: 24, marginBottom: 6 }}>🔍</div>
+              <div style={{ fontSize: 12.5, fontWeight: 800, color: "#4c1d95" }}>Mulai Mengetik Pasien Baru</div>
+              <div style={{ fontSize: 11, color: "#7e22ce", marginTop: 4, lineHeight: 1.4 }}>
+                Ketik NIK, nama lengkap, atau nomor HP pada form pendaftaran untuk memicu analisis duplikasi real-time dari database.
+              </div>
+            </div>
+          ) : duplicateCheck.match && duplicateCheck.matchPatient ? (
             <div style={{ background: "#fff", borderRadius: 16, padding: 16, border: "1px solid #f3e8ff" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                 {/* Score Circle */}
-                <div style={{ width: 70, height: 70, borderRadius: "50%", background: "conic-gradient(#ff7860 0% 78%, #e2e8f0 78% 100%)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <div style={{
+                  width: 70, height: 70, borderRadius: "50%",
+                  background: `conic-gradient(${duplicateCheck.score >= 80 ? '#ef4444' : duplicateCheck.score >= 60 ? '#f59e0b' : '#3b82f6'} 0% ${duplicateCheck.score}%, #e2e8f0 ${duplicateCheck.score}% 100%)`,
+                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
+                }}>
                   <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#fff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                     <span style={{ fontSize: 14, fontWeight: 900, color: "#0f172a" }}>{duplicateCheck.score}%</span>
-                    <span style={{ fontSize: 7.5, color: "#e04939", fontWeight: 800 }}>Kemiripan</span>
+                    <span style={{ fontSize: 7.5, color: duplicateCheck.score >= 80 ? "#dc2626" : duplicateCheck.score >= 60 ? "#d97706" : "#2563eb", fontWeight: 800 }}>Kemiripan</span>
                   </div>
                 </div>
 
                 {/* Match Patient Card */}
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 10.5, fontWeight: 700, color: "#94a3b8" }}>Kemungkinan Pasien Sama Dengan:</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
-                    <strong style={{ fontSize: 13, color: "#0f172a" }}>{duplicateCheck.matchPatient?.name || "Andi Pratama"}</strong>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2, flexWrap: "wrap" }}>
+                    <strong style={{ fontSize: 13, color: "#0f172a" }}>{duplicateCheck.matchPatient.name}</strong>
                     <span style={{ background: "#e0f2fe", color: "#0369a1", padding: "1px 6px", borderRadius: 6, fontSize: 9.5, fontWeight: 800 }}>
-                      {duplicateCheck.matchPatient?.rm || "RM000045"}
+                      {duplicateCheck.matchPatient.rm}
                     </span>
                   </div>
-                  <div style={{ fontSize: 10.5, color: "#64748b", marginTop: 4 }}>
-                    NIK: {duplicateCheck.matchPatient?.nik || "3175071505960001"}<br />
-                    Tgl Lahir: {duplicateCheck.matchPatient?.dob || "15 Mei 1996"}<br />
-                    No. HP: {duplicateCheck.matchPatient?.phone || "0812-3456-7890"}
+                  <div style={{ fontSize: 10.5, color: "#64748b", marginTop: 4, lineHeight: 1.4 }}>
+                    NIK: {duplicateCheck.matchPatient.nik}<br />
+                    Tgl Lahir: {duplicateCheck.matchPatient.dob}<br />
+                    No. HP: {duplicateCheck.matchPatient.phone}
                   </div>
-                  <button onClick={() => setSelectedPatient(duplicateCheck.matchPatient || patients[0])} style={{ border: "none", background: "none", color: "#8b5cf6", fontSize: 11, fontWeight: 800, cursor: "pointer", padding: 0, marginTop: 6 }}>
+                  <button 
+                    onClick={() => setSelectedPatient(duplicateCheck.matchPatient)} 
+                    style={{ border: "none", background: "none", color: "#8b5cf6", fontSize: 11, fontWeight: 800, cursor: "pointer", padding: 0, marginTop: 6 }}>
                     Lihat Detail →
                   </button>
                 </div>
               </div>
             </div>
           ) : (
-            <div style={{ background: "#fff", borderRadius: 16, padding: 16, border: "1px solid #f3e8ff", textAlign: "center", color: "#166534", fontSize: 12, fontWeight: 700 }}>
-              ✅ AI tidak menemukan potensi duplikasi data pasien ini.
+            <div style={{ background: "#fff", borderRadius: 16, padding: 16, border: "1px solid #dcfce7", textAlign: "center", color: "#166534" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 12.5, fontWeight: 800 }}>
+                <CheckCircle2 style={{ width: 18, height: 18, color: "#16a34a" }} />
+                Tidak Ada Duplikasi Ditemukan
+              </div>
+              <p style={{ fontSize: 11, color: "#166534", marginTop: 4, margin: 0 }}>
+                ✅ AI tidak menemukan potensi duplikasi data pasien ini di database Supabase.
+              </p>
             </div>
           )}
 

@@ -356,7 +356,7 @@ export const completePaymentAutoFinish = async (patientName: string, patientRm?:
   } catch (e) {}
 };
 
-export const resetAllData = () => {
+export const resetAllData = async () => {
   if (typeof window === "undefined") return;
   localStorage.removeItem("clinic_patients_v1");
   localStorage.removeItem("clinic_appointments_v1");
@@ -368,7 +368,18 @@ export const resetAllData = () => {
   localStorage.removeItem("clinic_lab_v1");
   localStorage.removeItem("clinic_audit_logs_v1");
   localStorage.removeItem("clinic_documents_v1");
-  logAuditEvent("Reset System Data", "System", "Seluruh data sampel berhasil dibersihkan");
+
+  try {
+    // Clear sample records from Supabase tables if connected
+    await supabase.from("patients").delete().neq("medical_record_number", "RM_NONE_RETAIN");
+    await supabase.from("encounters").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    await supabase.from("queues").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    await supabase.from("appointments").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+  } catch (e) {
+    console.warn("Failed clearing Supabase tables:", e);
+  }
+
+  logAuditEvent("Reset System Data", "System", "Seluruh data sampel berhasil dibersihkan dari database & storage");
 };
 
 // ======================== CLINIC PROFILE & SECURITY STORE ========================

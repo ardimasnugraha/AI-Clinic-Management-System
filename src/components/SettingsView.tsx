@@ -10,7 +10,7 @@ import {
   ClinicProfile, defaultClinicProfile, getClinicProfile, saveClinicProfile,
   SecuritySettings, defaultSecuritySettings, getSecuritySettings, saveSecuritySettings
 } from "@/lib/store";
-import { supabase } from "@/lib/supabase/client";
+import { supabase, isConfigured } from "@/lib/supabase/client";
 
 const Container = ({ style, ...p }: any) => (
   <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e8f0fe", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", ...style }} {...p} />
@@ -42,6 +42,12 @@ export default function SettingsView() {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [patients, setPatients] = useState<any[]>([]);
   const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
+  const [currentUserRole, setCurrentUserRole] = useState<string>("");
+
+  const isAdmin = 
+    currentUserRole.toLowerCase().includes("admin") || 
+    currentUserEmail.toLowerCase().includes("admin") || 
+    currentUserEmail.toLowerCase() === "admin@klinikai.co.id";
 
   // Profil Klinik State
   const [profileForm, setProfileForm] = useState<ClinicProfile>(defaultClinicProfile);
@@ -88,33 +94,49 @@ export default function SettingsView() {
     }
   };
 
+  const loadPatients = async () => {
+    try {
+      const { data, error } = await supabase.from("patients").select("*").order("created_at", { ascending: false });
+      if (!error && data) {
+        setPatients(data);
+      }
+    } catch (e) {}
+  };
+
   useEffect(() => {
     // Load persisted clinic profile & security settings
     setProfileForm(getClinicProfile());
     setSecurityForm(getSecuritySettings());
 
     loadDoctors();
-
-    async function loadPatients() {
-      const { data, error } = await supabase.from("patients").select("*").order("medical_record_number", { ascending: true });
-      if (!error) setPatients(data || []);
-    }
     loadPatients();
 
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
-        setCurrentUserEmail(user.email || "");
+        const email = user.email || "";
+        const role = user.user_metadata?.role || (email.toLowerCase().includes("admin") ? "Admin Klinik" : "Dokter");
+        setCurrentUserEmail(email);
+        setCurrentUserRole(role);
       }
     });
   }, []);
 
+  const handleRefreshPatients = async () => {
+    await loadPatients();
+    showToast("🔄 Data pasien Supabase berhasil diperbarui secara live.");
+  };
+
   const handleDeletePatient = async (rm: string) => {
-    if (!confirm(`Yakin menghapus data pasien RM: ${rm} secara permanen?`)) return;
+    if (!isAdmin) {
+      alert("🔒 Akses Ditolak: Anda masuk sebagai Dokter. Hanya Administrator Klinik yang dapat menghapus data pasien dari database.");
+      return;
+    }
+    if (!confirm(`Yakin menghapus data pasien RM: ${rm} secara permanen dari database Supabase?`)) return;
     try {
       const { error } = await supabase.from("patients").delete().eq("medical_record_number", rm);
       if (error) throw error;
       setPatients(p => p.filter(pat => pat.medical_record_number !== rm));
-      showToast("Data Pasien berhasil dihapus dari Supabase.");
+      showToast("✅ Data Pasien berhasil dihapus dari database Supabase.");
     } catch (e) {
       console.error(e);
       alert("Gagal menghapus pasien dari Supabase.");
@@ -246,10 +268,14 @@ export default function SettingsView() {
     showToast(`Dokter ${name} berhasil dihapus.`);
   };
 
-  const handleResetDataClick = () => {
-    if (confirm("⚠️ PERHATIAN: Apakah Anda yakin ingin mengosongkan semua data sampel (Pasien, Appointment, Antrean, Encounter, Billing, dll) untuk memulai dari nol?\n\nTindakan ini tidak dapat dibatalkan.")) {
-      resetAllData();
-      showToast("Seluruh data sampel telah dibersihkan! Anda dapat mulai menginput data baru.");
+  const handleResetDataClick = async () => {
+    if (!isAdmin) {
+      alert("🔒 Akses Ditolak: Anda masuk sebagai Dokter. Hanya Administrator Klinik yang memiliki hak akses untuk memicu pembersihan database & reset data sampel.");
+      return;
+    }
+    if (confirm("⚠️ PERHATIAN ADMINISTRATOR: Apakah Anda yakin ingin mengosongkan semua data sampel (Pasien, Appointment, Antrean, Encounter, Billing, dll)?\n\nTindakan ini akan menghapus data sampel dari database & penyimpanan lokal secara permanen.")) {
+      await resetAllData();
+      showToast("✅ Seluruh data sampel berhasil dibersihkan dari database & penyimpanan lokal!");
       setTimeout(() => {
         window.location.reload();
       }, 1200);
@@ -341,7 +367,7 @@ export default function SettingsView() {
                   <p style={{ fontSize: 12, color: "#64748b", margin: "2px 0 0" }}>Kelola jadwal dokter pemeriksa, poli spesialisasi, dan nomor SIP</p>
                 </div>
 
-                {currentUserEmail.toLowerCase() === "admin@klinikai.co.id" && (
+                {isAdmin && (
                   <button 
                     onClick={handleOpenAddDoctor}
                     style={{ display: "flex", alignItems: "center", gap: 6, background: "#0d9488", color: "#fff", border: "none", borderRadius: 10, padding: "9px 18px", fontSize: 12.5, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 12px rgba(13,148,136,0.25)" }}>
@@ -368,7 +394,7 @@ export default function SettingsView() {
                       </div>
                     </div>
 
-                    {currentUserEmail.toLowerCase() === "admin@klinikai.co.id" && (
+                    {isAdmin && (
                       <div style={{ display: "flex", gap: 8, borderTop: "1px solid #e2e8f0", paddingTop: 10 }}>
                         <button 
                           onClick={() => handleOpenEditDoctor(doc)}
@@ -391,24 +417,57 @@ export default function SettingsView() {
           {/* TAB 5: DATABASE & RESET DATA */}
           {active === "database" && (
             <Container style={{ padding: 26 }}>
-              <h2 style={{ fontSize: 17, fontWeight: 800, color: "#0f172a", margin: "0 0 16px" }}>Database & Pembersihan Data</h2>
-
-              <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, padding: 18, marginBottom: 20 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                  <Database style={{ width: 20, height: 20, color: "#0d9488" }} />
-                  <h4 style={{ fontSize: 14, fontWeight: 800, color: "#0f172a", margin: 0 }}>Status Koneksi Database</h4>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <div>
+                  <h2 style={{ fontSize: 17, fontWeight: 800, color: "#0f172a", margin: 0 }}>Database & Pembersihan Data</h2>
+                  <p style={{ fontSize: 12, color: "#64748b", margin: "2px 0 0" }}>Kelola koneksi database Supabase dan operasi pembersihan data sampel klinik.</p>
                 </div>
-                <p style={{ fontSize: 12, color: "#64748b", margin: 0 }}>
-                  Aplikasi aktif menggunakan <strong>Supabase Cloud & Unified LocalStorage Store</strong>. Seluruh data transaksi tersimpan secara persisten.
+                <button
+                  onClick={handleRefreshPatients}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", background: "#fff", color: "#334155", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                  <RefreshCw style={{ width: 14, height: 14, color: "#0d9488" }} /> Refresh Data Database
+                </button>
+              </div>
+
+              {/* Security Restricted Access Banner for Non-Admin / Doctors */}
+              {!isAdmin && (
+                <div style={{ background: "#eff6ff", border: "1.5px solid #bfdbfe", borderRadius: 14, padding: "16px 20px", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
+                  <Lock style={{ width: 22, height: 22, color: "#2563eb", flexShrink: 0 }} />
+                  <div>
+                    <strong style={{ fontSize: 13, color: "#1e40af", display: "block", marginBottom: 2 }}>Akses Terbatas: Mode Dokter (Non-Admin)</strong>
+                    <p style={{ fontSize: 12, color: "#1e3a8a", margin: 0, lineHeight: 1.4 }}>
+                      Fitur pembersihan data dan pengurusan database hanya dapat dieksekusi oleh <strong>Admin Klinik</strong>. Akun Anda terdeteksi sebagai Dokter, sehingga fitur hapus dan reset data dikunci untuk keamanan database klinik.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Status Koneksi Database Card */}
+              <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, padding: 18, marginBottom: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <Database style={{ width: 20, height: 20, color: "#0d9488" }} />
+                    <h4 style={{ fontSize: 14, fontWeight: 800, color: "#0f172a", margin: 0 }}>Status Koneksi Database</h4>
+                  </div>
+                  <span style={{ background: isConfigured ? "#dcfce7" : "#fef3c7", color: isConfigured ? "#15803d" : "#b45309", padding: "3px 10px", borderRadius: 12, fontSize: 11, fontWeight: 800 }}>
+                    {isConfigured ? "🟢 Supabase Cloud Online" : "🟡 Storage Lokal Active"}
+                  </span>
+                </div>
+                <p style={{ fontSize: 12, color: "#64748b", margin: 0, lineHeight: 1.5 }}>
+                  Aplikasi aktif menggunakan <strong>Supabase Cloud Database</strong> & <strong>Unified LocalStorage Store</strong>. Tersimpan <strong>{patients.length} data pasien</strong> secara persisten di database.
                 </p>
               </div>
 
               {/* Patient Data Management */}
               <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 18, marginBottom: 20 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                  <User style={{ width: 20, height: 20, color: "#0d9488" }} />
-                  <h4 style={{ fontSize: 14, fontWeight: 800, color: "#0f172a", margin: 0 }}>Data Pasien di Supabase</h4>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <User style={{ width: 20, height: 20, color: "#0d9488" }} />
+                    <h4 style={{ fontSize: 14, fontWeight: 800, color: "#0f172a", margin: 0 }}>Data Pasien di Supabase</h4>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>Total: {patients.length} Pasien</span>
                 </div>
+
                 <div style={{ overflowX: "auto", maxHeight: 300 }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
                     <thead style={{ position: "sticky", top: 0, background: "#f8fafc", zIndex: 10 }}>
@@ -421,22 +480,31 @@ export default function SettingsView() {
                     </thead>
                     <tbody>
                       {patients.map(p => (
-                        <tr key={p.medical_record_number} style={{ borderBottom: "1px solid #e2e8f0" }}>
+                        <tr key={p.medical_record_number || p.id} style={{ borderBottom: "1px solid #e2e8f0" }}>
                           <td style={{ padding: "10px", color: "#0f172a", fontWeight: 600 }}>{p.medical_record_number}</td>
                           <td style={{ padding: "10px", color: "#334155" }}>{p.full_name}</td>
-                          <td style={{ padding: "10px", color: "#64748b" }}>{p.nik}</td>
+                          <td style={{ padding: "10px", color: "#64748b" }}>{p.nik || "-"}</td>
                           <td style={{ padding: "10px", textAlign: "center" }}>
-                            <button 
-                              onClick={() => handleDeletePatient(p.medical_record_number)}
-                              style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #fecaca", background: "#fef2f2", fontSize: 11, fontWeight: 700, color: "#dc2626", cursor: "pointer" }}>
-                              Hapus
-                            </button>
+                            {isAdmin ? (
+                              <button 
+                                onClick={() => handleDeletePatient(p.medical_record_number)}
+                                style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #fecaca", background: "#fef2f2", fontSize: 11, fontWeight: 700, color: "#dc2626", cursor: "pointer" }}>
+                                Hapus
+                              </button>
+                            ) : (
+                              <button 
+                                disabled
+                                title="Hanya Admin Klinik yang dapat menghapus data pasien"
+                                style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #cbd5e1", background: "#f1f5f9", fontSize: 11, fontWeight: 700, color: "#94a3b8", cursor: "not-allowed", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                <Lock style={{ width: 10, height: 10 }} /> Terkunci
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
                       {patients.length === 0 && (
                         <tr>
-                          <td colSpan={4} style={{ padding: "20px", textAlign: "center", color: "#94a3b8" }}>Belum ada data pasien di Supabase.</td>
+                          <td colSpan={4} style={{ padding: "20px", textAlign: "center", color: "#94a3b8" }}>Belum ada data pasien di Supabase database.</td>
                         </tr>
                       )}
                     </tbody>
@@ -445,19 +513,28 @@ export default function SettingsView() {
               </div>
 
               {/* Reset Data Danger Zone */}
-              <div style={{ background: "#fff5f5", border: "1.5px solid #fecaca", borderRadius: 14, padding: 20 }}>
+              <div style={{ background: isAdmin ? "#fff5f5" : "#fafafa", border: `1.5px solid ${isAdmin ? '#fecaca' : '#e2e8f0'}`, borderRadius: 14, padding: 20 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                  <AlertTriangle style={{ width: 22, height: 22, color: "#dc2626" }} />
-                  <h4 style={{ fontSize: 15, fontWeight: 800, color: "#991b1b", margin: 0 }}>Reset & Clean Data Sampel</h4>
+                  <AlertTriangle style={{ width: 22, height: 22, color: isAdmin ? "#dc2626" : "#64748b" }} />
+                  <h4 style={{ fontSize: 15, fontWeight: 800, color: isAdmin ? "#991b1b" : "#475569", margin: 0 }}>Reset & Clean Data Sampel</h4>
                 </div>
-                <p style={{ fontSize: 12, color: "#7f1d1d", margin: "0 0 16px", lineHeight: 1.5 }}>
+                <p style={{ fontSize: 12, color: isAdmin ? "#7f1d1d" : "#64748b", margin: "0 0 16px", lineHeight: 1.5 }}>
                   Klik tombol di bawah untuk <strong>membersihkan semua data transaksi contoh/sampel</strong> (Pasien, Appointment, Antrean, Encounter, Resep, dan Billing). Gunakan fitur ini jika Anda ingin memulai sistem ini dalam keadaan bersih murni dari nol untuk data klinik Anda.
                 </p>
-                <button 
-                  onClick={handleResetDataClick}
-                  style={{ background: "#dc2626", color: "#fff", border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 13, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 12px rgba(220,38,38,0.3)", display: "flex", alignItems: "center", gap: 8 }}>
-                  <RefreshCw style={{ width: 15, height: 15 }} /> Bersihkan Semua Data Sampel
-                </button>
+                {isAdmin ? (
+                  <button 
+                    onClick={handleResetDataClick}
+                    style={{ background: "#dc2626", color: "#fff", border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 13, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 12px rgba(220,38,38,0.3)", display: "flex", alignItems: "center", gap: 8 }}>
+                    <RefreshCw style={{ width: 15, height: 15 }} /> Bersihkan Semua Data Sampel
+                  </button>
+                ) : (
+                  <button 
+                    disabled
+                    onClick={handleResetDataClick}
+                    style={{ background: "#cbd5e1", color: "#64748b", border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 13, fontWeight: 800, cursor: "not-allowed", display: "flex", alignItems: "center", gap: 8 }}>
+                    <Lock style={{ width: 15, height: 15 }} /> Bersihkan Semua Data Sampel (Khusus Admin)
+                  </button>
+                )}
               </div>
             </Container>
           )}

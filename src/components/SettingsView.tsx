@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { 
   Settings, User, Bell, Shield, Database, Building2, Palette, Save, 
-  ChevronRight, Lock, Globe, Smartphone, Plus, Stethoscope, Edit2, Trash2, Check, RefreshCw, AlertTriangle
+  ChevronRight, Lock, Globe, Smartphone, Plus, Stethoscope, Edit2, Trash2, Check, RefreshCw, AlertTriangle, Search, Eye, Phone, Mail, MapPin, Calendar, ShieldCheck
 } from "lucide-react";
 import { 
   Doctor, getStoredDoctors, saveStoredDoctors, addStoredDoctor, resetAllData,
@@ -43,6 +43,21 @@ export default function SettingsView() {
   const [patients, setPatients] = useState<any[]>([]);
   const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
   const [currentUserRole, setCurrentUserRole] = useState<string>("");
+
+  // Supabase Patient Search & Modal States
+  const [patientSearch, setPatientSearch] = useState("");
+  const [selectedDbPatient, setSelectedDbPatient] = useState<any | null>(null);
+  const [showAddDbPatientModal, setShowAddDbPatientModal] = useState(false);
+  const [newDbPatient, setNewDbPatient] = useState({
+    fullName: "",
+    nik: "",
+    dob: "",
+    gender: "Laki-laki",
+    phone: "",
+    email: "",
+    address: "",
+    insurance: "BPJS Kesehatan"
+  });
 
   const isAdmin = 
     currentUserRole.toLowerCase().includes("admin") || 
@@ -119,6 +134,27 @@ export default function SettingsView() {
         setCurrentUserRole(role);
       }
     });
+
+    // Supabase Real-time Listener on 'patients' table
+    let patientChannel: any = null;
+    if (isConfigured) {
+      patientChannel = supabase
+        .channel("settings-realtime-patients")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "patients" },
+          () => {
+            loadPatients();
+          }
+        )
+        .subscribe();
+    }
+
+    return () => {
+      if (patientChannel) {
+        supabase.removeChannel(patientChannel);
+      }
+    };
   }, []);
 
   const handleRefreshPatients = async () => {
@@ -126,22 +162,81 @@ export default function SettingsView() {
     showToast("🔄 Data pasien Supabase berhasil diperbarui secara live.");
   };
 
-  const handleDeletePatient = async (rm: string) => {
+  const handleAddPatientToSupabase = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDbPatient.fullName.trim()) {
+      alert("Nama Lengkap pasien wajib diisi.");
+      return;
+    }
+
+    const nextRmNum = patients.length + 180;
+    const newRm = `RM000${nextRmNum}`;
+
+    try {
+      const { error } = await supabase.from("patients").insert([{
+        clinic_id: "11111111-1111-1111-1111-111111111111",
+        medical_record_number: newRm,
+        full_name: newDbPatient.fullName,
+        date_of_birth: newDbPatient.dob || "2000-01-01",
+        sex_at_birth: newDbPatient.gender,
+        phone: newDbPatient.phone || "-",
+        nik: newDbPatient.nik || "-",
+        email: newDbPatient.email || "-",
+        address: newDbPatient.address || "-",
+        insurance: newDbPatient.insurance || "Umum",
+        status: "active"
+      }]);
+
+      if (error) throw error;
+
+      showToast(`✅ Pasien ${newDbPatient.fullName} (${newRm}) berhasil ditambahkan ke database Supabase!`);
+      setShowAddDbPatientModal(false);
+      setNewDbPatient({ fullName: "", nik: "", dob: "", gender: "Laki-laki", phone: "", email: "", address: "", insurance: "BPJS Kesehatan" });
+      await loadPatients();
+    } catch (err: any) {
+      console.error(err);
+      alert(`Gagal menyimpan data pasien ke Supabase: ${err.message || err}`);
+    }
+  };
+
+  const handleDeletePatient = async (rm: string, name: string = "") => {
     if (!isAdmin) {
       alert("🔒 Akses Ditolak: Anda masuk sebagai Dokter. Hanya Administrator Klinik yang dapat menghapus data pasien dari database.");
       return;
     }
-    if (!confirm(`Yakin menghapus data pasien RM: ${rm} secara permanen dari database Supabase?`)) return;
+    if (!confirm(`⚠️ PERHATIAN: Yakin menghapus data pasien ${name ? name + ' ' : ''}(RM: ${rm}) secara permanen dari database Supabase?`)) return;
     try {
       const { error } = await supabase.from("patients").delete().eq("medical_record_number", rm);
       if (error) throw error;
+
+      // Clean local storage cache if patient exists there
+      try {
+        const localData = localStorage.getItem("clinic_patients_v1");
+        if (localData) {
+          const localPatients = JSON.parse(localData);
+          const filtered = localPatients.filter((p: any) => p.rm !== rm);
+          localStorage.setItem("clinic_patients_v1", JSON.stringify(filtered));
+        }
+      } catch (e) {}
+
       setPatients(p => p.filter(pat => pat.medical_record_number !== rm));
-      showToast("✅ Data Pasien berhasil dihapus dari database Supabase.");
+      if (selectedDbPatient?.medical_record_number === rm) setSelectedDbPatient(null);
+      showToast(`✅ Data Pasien ${name || rm} berhasil dihapus dari database Supabase.`);
     } catch (e) {
       console.error(e);
       alert("Gagal menghapus pasien dari Supabase.");
     }
   };
+
+  const filteredDbPatients = patients.filter(p => {
+    const query = patientSearch.trim().toLowerCase();
+    if (!query) return true;
+    const name = (p.full_name || "").toLowerCase();
+    const rm = (p.medical_record_number || "").toLowerCase();
+    const nik = (p.nik || "").toLowerCase();
+    const phone = (p.phone || "").toLowerCase();
+    return name.includes(query) || rm.includes(query) || nik.includes(query) || phone.includes(query);
+  });
 
   const handleSaveSettings = () => {
     saveClinicProfile(profileForm);
@@ -460,51 +555,99 @@ export default function SettingsView() {
 
               {/* Patient Data Management */}
               <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 18, marginBottom: 20 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <User style={{ width: 20, height: 20, color: "#0d9488" }} />
                     <h4 style={{ fontSize: 14, fontWeight: 800, color: "#0f172a", margin: 0 }}>Data Pasien di Supabase</h4>
+                    <span style={{ background: "#e0f2fe", color: "#0369a1", padding: "2px 8px", borderRadius: 10, fontSize: 11, fontWeight: 800 }}>
+                      {filteredDbPatients.length} / {patients.length} Pasien
+                    </span>
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>Total: {patients.length} Pasien</span>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <div style={{ position: "relative", width: 220 }}>
+                      <Search style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#94a3b8" }} />
+                      <input 
+                        type="text"
+                        value={patientSearch}
+                        onChange={e => setPatientSearch(e.target.value)}
+                        placeholder="Cari RM, nama, NIK..."
+                        style={{ width: "100%", paddingLeft: 30, paddingRight: 10, paddingTop: 6, paddingBottom: 6, borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 11.5, outline: "none" }}
+                      />
+                    </div>
+                    <button
+                      onClick={() => setShowAddDbPatientModal(true)}
+                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 8, border: "none", background: "#0d9488", color: "#fff", fontSize: 11.5, fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 6px rgba(13,148,136,0.2)" }}>
+                      <Plus style={{ width: 14, height: 14 }} /> Tambah Pasien Supabase
+                    </button>
+                  </div>
                 </div>
 
-                <div style={{ overflowX: "auto", maxHeight: 300 }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                <div style={{ overflowX: "auto", maxHeight: 340 }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                     <thead style={{ position: "sticky", top: 0, background: "#f8fafc", zIndex: 10 }}>
-                      <tr style={{ borderBottom: "1px solid #e2e8f0" }}>
-                        <th style={{ padding: "10px", textAlign: "left", fontWeight: 700, color: "#475569" }}>RM</th>
-                        <th style={{ padding: "10px", textAlign: "left", fontWeight: 700, color: "#475569" }}>Nama Lengkap</th>
-                        <th style={{ padding: "10px", textAlign: "left", fontWeight: 700, color: "#475569" }}>NIK</th>
-                        <th style={{ padding: "10px", textAlign: "center", fontWeight: 700, color: "#475569" }}>Aksi</th>
+                      <tr style={{ borderBottom: "1.5px solid #e2e8f0", color: "#475569" }}>
+                        <th style={{ padding: "10px", textAlign: "left", fontWeight: 700 }}>RM</th>
+                        <th style={{ padding: "10px", textAlign: "left", fontWeight: 700 }}>Nama Lengkap</th>
+                        <th style={{ padding: "10px", textAlign: "left", fontWeight: 700 }}>NIK</th>
+                        <th style={{ padding: "10px", textAlign: "left", fontWeight: 700 }}>Tgl Lahir / Sex</th>
+                        <th style={{ padding: "10px", textAlign: "left", fontWeight: 700 }}>No. HP</th>
+                        <th style={{ padding: "10px", textAlign: "center", fontWeight: 700 }}>Status</th>
+                        <th style={{ padding: "10px", textAlign: "center", fontWeight: 700 }}>Aksi</th>
                       </tr>
                     </thead>
-                    <tbody>
-                      {patients.map(p => (
-                        <tr key={p.medical_record_number || p.id} style={{ borderBottom: "1px solid #e2e8f0" }}>
-                          <td style={{ padding: "10px", color: "#0f172a", fontWeight: 600 }}>{p.medical_record_number}</td>
-                          <td style={{ padding: "10px", color: "#334155" }}>{p.full_name}</td>
-                          <td style={{ padding: "10px", color: "#64748b" }}>{p.nik || "-"}</td>
+                    <tbody style={{ color: "#334155" }}>
+                      {filteredDbPatients.map(p => (
+                        <tr key={p.medical_record_number || p.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                          <td style={{ padding: "10px" }}>
+                            <span style={{ background: "#f0fdf4", color: "#166534", padding: "3px 8px", borderRadius: 6, fontSize: 11, fontWeight: 800, fontFamily: "monospace" }}>
+                              {p.medical_record_number}
+                            </span>
+                          </td>
+                          <td style={{ padding: "10px", color: "#0f172a", fontWeight: 800 }}>{p.full_name}</td>
+                          <td style={{ padding: "10px", color: "#64748b", fontFamily: "monospace", fontSize: 11 }}>{p.nik || "-"}</td>
+                          <td style={{ padding: "10px", color: "#475569" }}>
+                            {p.date_of_birth ? new Date(p.date_of_birth).toLocaleDateString("id-ID") : "-"}
+                            <span style={{ fontSize: 10, color: "#94a3b8", marginLeft: 4 }}>({p.sex_at_birth || "Laki-laki"})</span>
+                          </td>
+                          <td style={{ padding: "10px", color: "#475569" }}>{p.phone || "-"}</td>
                           <td style={{ padding: "10px", textAlign: "center" }}>
-                            {isAdmin ? (
-                              <button 
-                                onClick={() => handleDeletePatient(p.medical_record_number)}
-                                style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #fecaca", background: "#fef2f2", fontSize: 11, fontWeight: 700, color: "#dc2626", cursor: "pointer" }}>
-                                Hapus
+                            <span style={{ background: "#dcfce7", color: "#15803d", padding: "2px 8px", borderRadius: 10, fontSize: 10, fontWeight: 800 }}>
+                              {p.status || "active"}
+                            </span>
+                          </td>
+                          <td style={{ padding: "10px", textAlign: "center" }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                              <button
+                                onClick={() => setSelectedDbPatient(p)}
+                                title="Lihat Detail Pasien Supabase"
+                                style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", background: "#fff", fontSize: 11, fontWeight: 700, color: "#0369a1", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                                <Eye style={{ width: 12, height: 12 }} /> Detail
                               </button>
-                            ) : (
-                              <button 
-                                disabled
-                                title="Hanya Admin Klinik yang dapat menghapus data pasien"
-                                style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #cbd5e1", background: "#f1f5f9", fontSize: 11, fontWeight: 700, color: "#94a3b8", cursor: "not-allowed", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                                <Lock style={{ width: 10, height: 10 }} /> Terkunci
-                              </button>
-                            )}
+
+                              {isAdmin ? (
+                                <button 
+                                  onClick={() => handleDeletePatient(p.medical_record_number, p.full_name)}
+                                  style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #fecaca", background: "#fef2f2", fontSize: 11, fontWeight: 700, color: "#dc2626", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                                  <Trash2 style={{ width: 12, height: 12 }} /> Hapus
+                                </button>
+                              ) : (
+                                <button 
+                                  disabled
+                                  title="Hanya Admin Klinik yang dapat menghapus data pasien"
+                                  style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", background: "#f1f5f9", fontSize: 11, fontWeight: 700, color: "#94a3b8", cursor: "not-allowed", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                  <Lock style={{ width: 10, height: 10 }} /> Terkunci
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
-                      {patients.length === 0 && (
+                      {filteredDbPatients.length === 0 && (
                         <tr>
-                          <td colSpan={4} style={{ padding: "20px", textAlign: "center", color: "#94a3b8" }}>Belum ada data pasien di Supabase database.</td>
+                          <td colSpan={7} style={{ padding: "24px", textAlign: "center", color: "#94a3b8", fontSize: 12 }}>
+                            {patientSearch ? "Tidak ada data pasien Supabase yang cocok dengan kata kunci pencarian." : "Belum ada data pasien di Supabase database."}
+                          </td>
                         </tr>
                       )}
                     </tbody>
@@ -751,6 +894,123 @@ export default function SettingsView() {
                 <button type="submit" 
                   style={{ flex: 2, padding: "10.5px 0", borderRadius: 10, border: "none", background: "#0d9488", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", boxShadow: "0 4px 12px rgba(13,148,136,0.3)" }}>
                   {editingDoctor ? "Simpan Dokter" : "Tambah Dokter"}
+                </button>
+              </div>
+            </form>
+          </Container>
+        </div>
+      )}
+      {/* MODAL 1: DETAIL PASIEN SUPABASE */}
+      {selectedDbPatient && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(15,23,42,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <Container style={{ width: "100%", maxWidth: 500, padding: 24, boxShadow: "0 20px 40px rgba(0,0,0,0.2)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, borderBottom: "1px solid #f1f5f9", paddingBottom: 12 }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 900, color: "#0f172a", margin: 0 }}>{selectedDbPatient.full_name}</h3>
+                  <span style={{ background: "#e0f2fe", color: "#0369a1", padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 800 }}>
+                    {selectedDbPatient.medical_record_number}
+                  </span>
+                </div>
+                <p style={{ fontSize: 11.5, color: "#64748b", margin: "2px 0 0" }}>Detail Rekam Medis & Informasi di Supabase Cloud Database</p>
+              </div>
+              <button onClick={() => setSelectedDbPatient(null)} style={{ border: "none", background: "#f1f5f9", borderRadius: 8, width: 28, height: 28, cursor: "pointer", fontSize: 13, color: "#64748b", fontWeight: 700 }}>✕</button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 12, color: "#334155", background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid #e2e8f0" }}>
+              <div><strong>NIK:</strong> {selectedDbPatient.nik || "-"}</div>
+              <div><strong>Tanggal Lahir:</strong> {selectedDbPatient.date_of_birth ? new Date(selectedDbPatient.date_of_birth).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "-"}</div>
+              <div><strong>Jenis Kelamin:</strong> {selectedDbPatient.sex_at_birth || "Laki-laki"}</div>
+              <div><strong>No. HP:</strong> {selectedDbPatient.phone || "-"}</div>
+              <div><strong>Email:</strong> {selectedDbPatient.email || "-"}</div>
+              <div><strong>Alamat:</strong> {selectedDbPatient.address || "-"}</div>
+              <div><strong>Asuransi:</strong> {selectedDbPatient.insurance || "Umum / Bayar Sendiri"}</div>
+              <div><strong>Status Database:</strong> <span style={{ color: "#166534", fontWeight: 800 }}>{selectedDbPatient.status || "active"}</span></div>
+              <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 4 }}>Waktu Terdaftar: {selectedDbPatient.created_at ? new Date(selectedDbPatient.created_at).toLocaleString("id-ID") : "-"}</div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
+              {isAdmin && (
+                <button
+                  onClick={() => handleDeletePatient(selectedDbPatient.medical_record_number, selectedDbPatient.full_name)}
+                  style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid #fecaca", background: "#fef2f2", color: "#dc2626", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                  🗑️ Hapus Pasien Ini
+                </button>
+              )}
+              <button
+                onClick={() => setSelectedDbPatient(null)}
+                style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#0d9488", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                Tutup
+              </button>
+            </div>
+          </Container>
+        </div>
+      )}
+
+      {/* MODAL 2: TAMBAH PASIEN DIRECT SUPABASE */}
+      {showAddDbPatientModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(15,23,42,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <Container style={{ width: "100%", maxWidth: 480, padding: 22, boxShadow: "0 20px 40px rgba(0,0,0,0.2)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, borderBottom: "1px solid #f1f5f9", paddingBottom: 10 }}>
+              <div>
+                <h3 style={{ fontSize: 15, fontWeight: 800, color: "#0f172a", margin: 0 }}>Tambah Pasien Baru ke Supabase</h3>
+                <p style={{ fontSize: 11.5, color: "#64748b", margin: "2px 0 0" }}>Input langsung data pasien ke Cloud Database</p>
+              </div>
+              <button onClick={() => setShowAddDbPatientModal(false)} style={{ border: "none", background: "#f1f5f9", borderRadius: 8, width: 28, height: 28, cursor: "pointer", fontSize: 13, color: "#64748b", fontWeight: 700 }}>✕</button>
+            </div>
+
+            <form onSubmit={handleAddPatientToSupabase} style={{ display: "flex", flexDirection: "column", gap: 12, fontSize: 12 }}>
+              <div>
+                <label style={{ fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Nama Lengkap *</label>
+                <input type="text" required placeholder="Masukkan nama lengkap" value={newDbPatient.fullName} onChange={e => setNewDbPatient({ ...newDbPatient, fullName: e.target.value })} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", outline: "none" }} />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div>
+                  <label style={{ fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>NIK</label>
+                  <input type="text" placeholder="Masukkan NIK" value={newDbPatient.nik} onChange={e => setNewDbPatient({ ...newDbPatient, nik: e.target.value })} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", outline: "none" }} />
+                </div>
+                <div>
+                  <label style={{ fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Tanggal Lahir *</label>
+                  <input type="date" required value={newDbPatient.dob} onChange={e => setNewDbPatient({ ...newDbPatient, dob: e.target.value })} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", outline: "none" }} />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div>
+                  <label style={{ fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Jenis Kelamin</label>
+                  <select value={newDbPatient.gender} onChange={e => setNewDbPatient({ ...newDbPatient, gender: e.target.value })} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", outline: "none", cursor: "pointer" }}>
+                    <option>Laki-laki</option>
+                    <option>Perempuan</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>No. HP</label>
+                  <input type="tel" placeholder="Nomor HP" value={newDbPatient.phone} onChange={e => setNewDbPatient({ ...newDbPatient, phone: e.target.value })} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", outline: "none" }} />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Asuransi</label>
+                <select value={newDbPatient.insurance} onChange={e => setNewDbPatient({ ...newDbPatient, insurance: e.target.value })} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", outline: "none", cursor: "pointer" }}>
+                  <option>BPJS Kesehatan</option>
+                  <option>Mandiri Inhealth</option>
+                  <option>Prudential Health</option>
+                  <option>Umum / Bayar Sendiri</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>Alamat</label>
+                <textarea rows={2} placeholder="Alamat lengkap" value={newDbPatient.address} onChange={e => setNewDbPatient({ ...newDbPatient, address: e.target.value })} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", outline: "none", fontFamily: "inherit" }} />
+              </div>
+
+              <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                <button type="button" onClick={() => setShowAddDbPatientModal(false)} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", fontSize: 12, fontWeight: 700, color: "#64748b", cursor: "pointer" }}>
+                  Batal
+                </button>
+                <button type="submit" style={{ flex: 2, padding: "9px 0", borderRadius: 8, border: "none", background: "#0d9488", fontSize: 12, fontWeight: 700, color: "#fff", cursor: "pointer", boxShadow: "0 2px 8px rgba(13,148,136,0.2)" }}>
+                  💾 Simpan ke Supabase
                 </button>
               </div>
             </form>

@@ -78,6 +78,8 @@ export default function BillingView() {
     e.preventDefault();
     if (!showPayModal) return;
 
+    const targetInv = invoices.find(i => i.id === showPayModal.id);
+
     const updated = invoices.map(inv => {
       if (inv.id === showPayModal.id) {
         return {
@@ -97,10 +99,36 @@ export default function BillingView() {
         status: "Lunas",
         payment_method: payMethod
       }).or(`invoice_no.eq.${showPayModal.id},id.eq.${showPayModal.id}`);
+
+      // Upsert to ensure invoice is saved in Supabase if missing
+      if (targetInv) {
+        await supabase.from("invoices").upsert([{
+          clinic_id: "11111111-1111-1111-1111-111111111111",
+          invoice_no: targetInv.id,
+          patient_rm: targetInv.patientRm,
+          patient_name: targetInv.patientName,
+          doctor_name: targetInv.doctorName || "Dokter Poli",
+          insurance: targetInv.insurance || "Umum",
+          date: targetInv.date || new Date().toISOString().split("T")[0],
+          items: targetInv.items || [],
+          subtotal: targetInv.subtotal || targetInv.total,
+          tax: 0,
+          total: targetInv.total,
+          status: "Lunas",
+          payment_method: payMethod
+        }]);
+      }
     } catch (e) {}
 
     // Auto-update Appointment & Queue status to Selesai
     await completePaymentAutoFinish(showPayModal.patientName, showPayModal.patientRm);
+
+    // Dispatch global events for instant dashboard sync
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("clinic_billing_updated"));
+      window.dispatchEvent(new Event("clinic_queue_updated"));
+      window.dispatchEvent(new Event("clinic_patients_updated"));
+    }
 
     showToast(`Pembayaran Tagihan ${showPayModal.id} sebesar Rp ${showPayModal.total.toLocaleString("id-ID")} berhasil (Metode: ${payMethod})`);
     logAuditEvent("Proses Pembayaran Kasir", "Billing", `Pembayaran Lunas INV ${showPayModal.id} pasien ${showPayModal.patientName} via ${payMethod}`);

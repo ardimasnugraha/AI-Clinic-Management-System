@@ -6,7 +6,7 @@ import {
   Sparkles, ShieldCheck, ArrowRight, Eye, CheckCircle2, Shield, Lock, Activity, FileText,
   X, User, Stethoscope
 } from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
+import { supabase, isConfigured } from "@/lib/supabase/client";
 import { getStoredDoctors, Doctor as StoreDoctor } from "@/lib/store";
 
 interface DashboardViewProps {
@@ -156,101 +156,127 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
 
   const loadDashboardData = async () => {
     try {
-      // 1. Fetch Pasien dari Supabase
-      const { count: countP, data: pData } = await supabase.from("patients").select("*", { count: "exact" });
-      if (countP !== null) {
-        setPatientCount(countP);
-      } else {
-        const localP = localStorage.getItem("clinic_patients_v1");
-        if (localP) setPatientCount(JSON.parse(localP).length);
-      }
+      // 1. Fetch Pasien dari Supabase & LocalStorage (Gabungkan agar data pasien baru selalu terhitung)
+      let allPatientsList: any[] = [];
+      try {
+        const { data: pData } = await supabase.from("patients").select("*");
+        if (pData && pData.length > 0) allPatientsList = pData;
+      } catch (e) {}
 
-      // 2. Fetch Appointments dari Supabase
-      const { count: countA, data: apptsData } = await supabase.from("appointments").select("*", { count: "exact" });
-      let allAppts: any[] = [];
-      if (countA !== null) {
-        setTodayApptCount(countA);
-        if (apptsData) {
-          setAllApptsData(apptsData);
-          allAppts = apptsData;
-          const mappedAppts = apptsData.slice(0, 5).map((a: any) => ({
-            time: a.duration ? a.duration.split(" - ")[0] : "08:30",
-            name: a.doctor_name || "Pasien",
-            type: a.poli || "Konsultasi Umum",
-            status: a.status === "menunggu" ? "Menunggu" : a.status === "selesai" ? "Selesai" : "Terjadwal"
-          }));
-          setAppointmentsList(mappedAppts);
+      try {
+        const localP = localStorage.getItem("clinic_patients_v1");
+        if (localP) {
+          const parsedP: any[] = JSON.parse(localP);
+          parsedP.forEach(lp => {
+            if (!allPatientsList.some(p => p.medical_record_number === lp.rm || p.full_name === lp.name)) {
+              allPatientsList.push(lp);
+            }
+          });
         }
-      } else {
+      } catch (e) {}
+      setPatientCount(allPatientsList.length);
+
+      // 2. Fetch Appointments dari Supabase & LocalStorage
+      let allAppts: any[] = [];
+      try {
+        const { data: apptsData } = await supabase.from("appointments").select("*");
+        if (apptsData && apptsData.length > 0) allAppts = apptsData;
+      } catch (e) {}
+
+      try {
         const localA = localStorage.getItem("clinic_appointments_v1");
         if (localA) {
-          const parsedA = JSON.parse(localA);
-          setTodayApptCount(parsedA.length);
-          allAppts = parsedA;
-          setAppointmentsList(parsedA.slice(0, 5).map((a: any) => ({
-            time: a.time || "08:30",
-            name: a.patientName || a.name || "Pasien",
-            type: a.poli || "Konsultasi",
-            status: a.status || "Terjadwal"
-          })));
+          const parsedA: any[] = JSON.parse(localA);
+          parsedA.forEach(la => {
+            if (!allAppts.some(a => a.id === la.id)) {
+              allAppts.push(la);
+            }
+          });
         }
-      }
+      } catch (e) {}
 
-      // 3. Fetch Queues & Pendapatan
-      const { data: qData } = await supabase.from("queues").select("*").in("status", ["menunggu", "dipanggil"]);
-      let activeQueues: any[] = [];
-      if (qData) {
-        activeQueues = qData;
-        const activeCount = qData.filter((q: any) => q.status === "menunggu" || q.status === "dipanggil").length;
-        setActiveQueueCount(activeCount);
-        
-        const serving = qData.filter((q: any) => q.status === "dipanggil").map((q: any) => ({
-          ticket_no: q.ticket_no,
-          poli: q.poli
-        }));
-        setServingQueues(serving);
+      setTodayApptCount(allAppts.length);
+      setAllApptsData(allAppts);
+      const mappedAppts = allAppts.slice(0, 5).map((a: any) => ({
+        time: a.time || (a.duration ? a.duration.split(" - ")[0] : "08:30"),
+        name: a.patientName || a.name || a.doctor_name || "Pasien",
+        type: a.poli || "Konsultasi Umum",
+        status: a.status === "menunggu" ? "Menunggu" : a.status === "selesai" ? "Selesai" : "Terjadwal"
+      }));
+      setAppointmentsList(mappedAppts);
 
-        setLiveQueue(qData.map((q: any) => ({
-          no: q.ticket_no,
-          name: q.patient_name,
-          service: q.poli,
-          time: q.created_time || "09:00",
-          status: q.status === "dipanggil" ? "Dipanggil" : q.status === "menunggu" ? "Menunggu" : q.status
-        })));
-      } else {
-        // Fallback ke LocalStorage jika tabel Supabase tidak ada/error
-        const cached = localStorage.getItem("clinic_queue_v1");
-        if (cached) {
-          try {
-            const parsed = JSON.parse(cached);
-            const activeItems = parsed.filter((q: any) => q.status === "menunggu" || q.status === "dipanggil");
-            activeQueues = activeItems;
-            setActiveQueueCount(activeItems.length);
-            
-            const serving = activeItems.filter((q: any) => q.status === "dipanggil").map((q: any) => ({
-              ticket_no: q.no,
-              poli: q.poli
-            }));
-            setServingQueues(serving);
+      // 3. Fetch Queues (Antrean Aktif)
+      let allQueuesList: any[] = [];
+      try {
+        const { data: qData } = await supabase.from("queues").select("*");
+        if (qData && qData.length > 0) allQueuesList = qData;
+      } catch (e) {}
 
-            setLiveQueue(activeItems.map((q: any) => ({
-              no: q.no,
-              name: q.name,
-              service: q.poli,
-              time: q.createdTime || "09:00",
-              status: q.status === "dipanggil" ? "Dipanggil" : q.status === "menunggu" ? "Menunggu" : q.status
-            })));
-          } catch (e) {
-            console.warn("Gagal parse localStorage queue", e);
-          }
+      try {
+        const localQ = localStorage.getItem("clinic_queue_v1");
+        if (localQ) {
+          const parsedQ: any[] = JSON.parse(localQ);
+          parsedQ.forEach(lq => {
+            if (!allQueuesList.some(q => (q.ticket_no || q.no) === (lq.no || lq.ticket_no) || q.id === lq.id)) {
+              allQueuesList.push(lq);
+            }
+          });
         }
-      }
+      } catch (e) {}
 
-      const { data: invData } = await supabase.from("invoices").select("total").eq("status", "Lunas");
-      if (invData) {
-        const rev = invData.reduce((acc: number, curr: any) => acc + Number(curr.total || 0), 0);
-        setTodayRevenue(rev);
-      }
+      const activeQueues = allQueuesList.filter((q: any) => {
+        const s = String(q.status || "").toLowerCase();
+        return s === "menunggu" || s === "dipanggil" || s === "waiting" || s === "called";
+      });
+      setActiveQueueCount(activeQueues.length);
+
+      const serving = activeQueues.filter((q: any) => String(q.status || "").toLowerCase() === "dipanggil").map((q: any) => ({
+        ticket_no: q.ticket_no || q.no,
+        poli: q.poli
+      }));
+      setServingQueues(serving);
+
+      setLiveQueue(activeQueues.map((q: any) => ({
+        no: q.ticket_no || q.no,
+        name: q.patient_name || q.name,
+        service: q.poli,
+        time: q.created_time || q.createdTime || "09:00",
+        status: String(q.status || "").toLowerCase() === "dipanggil" ? "Dipanggil" : "Menunggu"
+      })));
+
+      // 4. Hitung Pendapatan Lunas (Super Accurate Sync: Supabase + LocalStorage)
+      let allInvoicesList: any[] = [];
+      try {
+        const { data: invData } = await supabase.from("invoices").select("*");
+        if (invData && invData.length > 0) allInvoicesList = invData;
+      } catch (e) {}
+
+      try {
+        const localBilling = localStorage.getItem("clinic_billing_v1");
+        if (localBilling) {
+          const parsedLocal: any[] = JSON.parse(localBilling);
+          parsedLocal.forEach(localInv => {
+            const idx = allInvoicesList.findIndex(i => (i.invoice_no || i.id) === (localInv.id || localInv.invoice_no));
+            if (idx === -1) {
+              allInvoicesList.push(localInv);
+            } else {
+              if (localInv.status === "Lunas" || localInv.status === "lunas" || localInv.status === "paid") {
+                allInvoicesList[idx].status = "Lunas";
+                allInvoicesList[idx].total = localInv.total || allInvoicesList[idx].total;
+              }
+            }
+          });
+        }
+      } catch (e) {}
+
+      const totalLunasRevenue = allInvoicesList
+        .filter((inv: any) => {
+          const s = String(inv.status || "").toLowerCase();
+          return s === "lunas" || s === "paid" || s === "selesai";
+        })
+        .reduce((acc: number, curr: any) => acc + (Number(curr.total) || Number(curr.subtotal) || 0), 0);
+
+      setTodayRevenue(totalLunasRevenue);
 
       // 4. Fetch Doctors & Hitung Slot Pasien Terdaftar dari Supabase
       const { data: docProfiles } = await supabase.from("doctor_profiles").select("*");
@@ -392,7 +418,7 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
       setAiMetrics({
         interactionCount: drugInteractionsCount,
         interactionDetails: drugInteractionDetails.length > 0 ? drugInteractionDetails.map((d, i) => `${i + 1}. ${d}`).join("\n") : "Tidak ada potensi interaksi obat berbahaya yang terdeteksi saat ini.",
-        followUpCount: countP || patientCount || 0,
+        followUpCount: patientCount || 0,
         visitGrowthPercent: totalEncounters > 0 ? 18 : 0
       });
 
@@ -429,6 +455,34 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
 
   useEffect(() => {
     loadDashboardData();
+
+    const handleDataUpdate = () => {
+      loadDashboardData();
+    };
+
+    window.addEventListener("clinic_billing_updated", handleDataUpdate);
+    window.addEventListener("clinic_queue_updated", handleDataUpdate);
+    window.addEventListener("clinic_patients_updated", handleDataUpdate);
+    window.addEventListener("clinic_appointments_updated", handleDataUpdate);
+
+    let channel: any = null;
+    if (isConfigured) {
+      channel = supabase
+        .channel("dashboard-live-sync")
+        .on("postgres_changes", { event: "*", schema: "public", table: "invoices" }, handleDataUpdate)
+        .on("postgres_changes", { event: "*", schema: "public", table: "patients" }, handleDataUpdate)
+        .on("postgres_changes", { event: "*", schema: "public", table: "queues" }, handleDataUpdate)
+        .on("postgres_changes", { event: "*", schema: "public", table: "appointments" }, handleDataUpdate)
+        .subscribe();
+    }
+
+    return () => {
+      window.removeEventListener("clinic_billing_updated", handleDataUpdate);
+      window.removeEventListener("clinic_queue_updated", handleDataUpdate);
+      window.removeEventListener("clinic_patients_updated", handleDataUpdate);
+      window.removeEventListener("clinic_appointments_updated", handleDataUpdate);
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [timeFilter]);
 
   useEffect(() => {

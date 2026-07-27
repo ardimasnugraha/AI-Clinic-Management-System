@@ -326,6 +326,10 @@ export default function PatientsView({ onMakeAppointment, onStartEncounter }: Pa
     setSelectedPatient(createdItem);
     localStorage.setItem("clinic_patients_v1", JSON.stringify(updated));
 
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("clinic_patients_updated"));
+    }
+
     // Reset Form
     setNewPatient({ name: "", nik: "", dob: "", gender: "Laki-laki", phone: "", email: "", address: "", insurance: "BPJS Kesehatan" });
     showToast(`✅ Berhasil mendaftarkan pasien baru ${createdItem.name} (${newRm})`);

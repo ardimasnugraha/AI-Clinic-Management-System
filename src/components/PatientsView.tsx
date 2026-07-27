@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { 
   Search, Plus, Download, MoreVertical, ChevronLeft, 
-  ChevronRight, Eye, User, Phone, Mail, MapPin, 
+  ChevronRight, User, Phone, Mail, MapPin, 
   ShieldCheck, AlertTriangle, Filter, Sparkles,
   CheckCircle2, FileText, ArrowRight, UserCheck, Calendar, Activity
 } from "lucide-react";
@@ -579,13 +579,6 @@ export default function PatientsView({ onMakeAppointment, onStartEncounter }: Pa
                         {/* Action Buttons */}
                         <td style={{ padding: "12px 8px", textAlign: "center", position: "relative" }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                            <button 
-                              onClick={() => setSelectedPatient(p)}
-                              title="Lihat Detail Pasien"
-                              style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                              <Eye style={{ width: 14, height: 14, color: "#64748b" }} />
-                            </button>
-
                             <button 
                               onClick={() => setActiveMenuRm(activeMenuRm === p.rm ? null : p.rm)}
                               title="Menu Opsi Pasien"

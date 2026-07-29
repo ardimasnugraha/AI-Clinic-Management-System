@@ -16,7 +16,6 @@ export interface HealthNewsItem {
   urgency: "Tinggi" | "Sedang" | "Info";
 }
 
-// Fallback internet health news with working external links
 const FALLBACK_INTERNET_NEWS: HealthNewsItem[] = [
   // Wabah & Infeksi
   {
@@ -53,7 +52,7 @@ const FALLBACK_INTERNET_NEWS: HealthNewsItem[] = [
   // Penyakit Kronis
   {
     id: "net-003",
-    title: "Panduan Baru Manajemen Hipertensi Primer 2026: Pentingnya Pemantauan Tekanan Darah Mandiri (HBPM)",
+    title: "Panduan Baru Manajemen Hipertensi Primer: Pentingnya Pemantauan Tekanan Darah Mandiri (HBPM)",
     summary: "Perhimpunan Dokter Spesialis Kardiovaskular Indonesia (PERKI) merilis pedoman tata laksana hipertensi terbaru yang menekankan Home Blood Pressure Monitoring.",
     category: "kronis",
     categoryLabel: "Penyakit Kronis",
@@ -161,7 +160,6 @@ function determineCategory(title: string, desc: string): { category: "wabah" | "
   return { category: "pencegahan", label: "Pencegahan & Nutrisi" };
 }
 
-// Helper to parse direct RSS XML text
 function parseDetikXml(xmlText: string): HealthNewsItem[] {
   const items: HealthNewsItem[] = [];
   const rawItems = xmlText.match(/<item[\s\S]*?<\/item>/gi) || [];
@@ -213,7 +211,7 @@ export async function GET(request: Request) {
 
     // 1. Fetch directly from Detik Health RSS
     try {
-      const detikRes = await fetch("https://health.detik.com/rss", { next: { revalidate: 300 } });
+      const detikRes = await fetch("https://health.detik.com/rss", { cache: "no-store" });
       if (detikRes.ok) {
         const text = await detikRes.text();
         const parsed = parseDetikXml(text);
@@ -225,48 +223,10 @@ export async function GET(request: Request) {
       console.warn("Gagal fetching Detik Health RSS:", e);
     }
 
-    // 2. Fetch via RSS2JSON if direct XML had few items
-    if (liveArticles.length < 5) {
-      try {
-        const r2jRes = await fetch("https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fhealth.detik.com%2Frss", { next: { revalidate: 300 } });
-        if (r2jRes.ok) {
-          const r2jData = await r2jRes.json();
-          if (r2jData.status === "ok" && Array.isArray(r2jData.items)) {
-            r2jData.items.forEach((it: any, i: number) => {
-              const t = (it.title || "").replace(/<[^>]*>/g, "").trim();
-              const l = (it.link || "").trim();
-              const d = (it.description || "").replace(/<[^>]*>/g, "").trim();
-              if (t && l && !liveArticles.some(a => a.title === t)) {
-                const cat = determineCategory(t, d);
-                liveArticles.push({
-                  id: `r2j-${i}-${Date.now()}`,
-                  title: t,
-                  summary: d.substring(0, 150) + "...",
-                  category: cat.category,
-                  categoryLabel: cat.label,
-                  source: "Detik Health (Internet Live)",
-                  sourceUrl: l,
-                  author: it.author || "Detik Health",
-                  publishedAt: it.pubDate || new Date().toISOString(),
-                  readTime: "3 min baca",
-                  imageUrl: it.thumbnail || "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=800&q=80",
-                  diseaseTags: ["#BeritaInternet", `#${cat.label.replace(/\s+/g, "")}`],
-                  urgency: "Info"
-                });
-              }
-            });
-          }
-        }
-      } catch (e) {}
-    }
-
-    // 3. Combine live internet articles with structured fallback articles
+    // 2. Combine live internet articles with structured fallback articles
     const articleMap = new Map<string, HealthNewsItem>();
 
-    // Add live internet news first
     liveArticles.forEach(item => articleMap.set(item.title, item));
-
-    // Fill in fallback news for categories to guarantee rich data
     FALLBACK_INTERNET_NEWS.forEach(item => {
       if (!articleMap.has(item.title)) {
         articleMap.set(item.title, item);
@@ -275,18 +235,27 @@ export async function GET(request: Request) {
 
     let result = Array.from(articleMap.values());
 
-    // 4. Filter by category if requested
+    // 3. Filter by category if requested
     if (category && category !== "semua") {
-      result = result.filter(item => item.category === category);
+      const categoryFiltered = result.filter(item => item.category === category);
+      // Guarantee at least fallback items for this category if live items didn't match
+      if (categoryFiltered.length > 0) {
+        result = categoryFiltered;
+      } else {
+        result = FALLBACK_INTERNET_NEWS.filter(item => item.category === category);
+      }
     }
 
-    // 5. Filter by search query if requested
+    // 4. Filter by search query if requested
     if (search && search.trim() !== "") {
-      result = result.filter(item => 
+      const searchFiltered = result.filter(item => 
         item.title.toLowerCase().includes(search) ||
         item.summary.toLowerCase().includes(search) ||
         item.source.toLowerCase().includes(search)
       );
+      if (searchFiltered.length > 0) {
+        result = searchFiltered;
+      }
     }
 
     return NextResponse.json({
@@ -296,13 +265,11 @@ export async function GET(request: Request) {
       articles: result
     });
   } catch (error: any) {
-    return NextResponse.json(
-      {
-        success: false,
-        message: error?.message || "Gagal mengambil data berita kesehatan internet",
-        articles: FALLBACK_INTERNET_NEWS
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: true,
+      updatedAt: new Date().toISOString(),
+      total: FALLBACK_INTERNET_NEWS.length,
+      articles: FALLBACK_INTERNET_NEWS
+    });
   }
 }

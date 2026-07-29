@@ -2,15 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 import { 
-  Newspaper, Search, RefreshCw, AlertTriangle, ExternalLink, 
-  Clock, Tag, X, Sparkles, ShieldAlert, BookOpen, ChevronRight, UserCheck, Flame
+  Newspaper, Search, RefreshCw, ExternalLink, 
+  Clock, BookOpen, Flame, ShieldAlert, Globe
 } from "lucide-react";
 
 export interface HealthNewsItem {
   id: string;
   title: string;
   summary: string;
-  content: string;
   category: "wabah" | "kronis" | "pencegahan" | "riset";
   categoryLabel: string;
   source: string;
@@ -21,7 +20,6 @@ export interface HealthNewsItem {
   imageUrl: string;
   diseaseTags: string[];
   urgency: "Tinggi" | "Sedang" | "Info";
-  keyTakeaways: string[];
 }
 
 const CATEGORIES = [
@@ -37,7 +35,6 @@ export default function HealthNewsWidget() {
   const [activeCategory, setActiveCategory] = useState<string>("semua");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
-  const [selectedArticle, setSelectedArticle] = useState<HealthNewsItem | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<string>("");
 
   const fetchNews = async () => {
@@ -57,7 +54,7 @@ export default function HealthNewsWidget() {
         setArticles(data.articles);
       }
     } catch (err) {
-      console.error("Gagal mengambil berita kesehatan:", err);
+      console.error("Gagal memuat berita kesehatan internet:", err);
     } finally {
       setLoading(false);
       const now = new Date();
@@ -74,7 +71,13 @@ export default function HealthNewsWidget() {
     fetchNews();
   };
 
-  // Find urgent health warning article if present
+  const handleOpenArticle = (url: string) => {
+    if (url) {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  // Urgent health warning article if present
   const urgentAlert = articles.find(a => a.urgency === "Tinggi");
 
   const formatDate = (isoString: string) => {
@@ -101,26 +104,26 @@ export default function HealthNewsWidget() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-slate-800">Portal Berita Kesehatan & Penyakit Terkini</h2>
+                <h2 className="text-lg font-bold text-slate-800">Portal Berita Kesehatan & Penyakit Internet Live</h2>
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                  Live Feed
+                  Live Feed Internet
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Update terkini dari Kemenkes RI, WHO, dan portal kesehatan medis terpercaya.
+                Berita kesehatan otomatis dari portal internet (Detik Health, Kemenkes, WHO, Kompas). Klik berita untuk langsung menuju portal asal.
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 flex-wrap">
           {/* Search Box */}
           <form onSubmit={handleSearchSubmit} className="relative flex-1 md:w-64">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Cari penyakit / topik..."
+              placeholder="Cari berita kesehatan di internet..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all text-slate-800"
@@ -131,7 +134,7 @@ export default function HealthNewsWidget() {
           <button
             onClick={fetchNews}
             disabled={loading}
-            title="Refresh Berita"
+            title="Refresh Berita Internet"
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded-lg transition-colors border border-slate-200 disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-teal-600" : ""}`} />
@@ -160,9 +163,12 @@ export default function HealthNewsWidget() {
         })}
       </div>
 
-      {/* Urgent Warning Banner (If high urgency alert available) */}
+      {/* Urgent Warning Banner */}
       {urgentAlert && (
-        <div className="mb-6 p-4 rounded-xl bg-amber-50/90 border border-amber-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div 
+          onClick={() => handleOpenArticle(urgentAlert.sourceUrl)}
+          className="mb-6 p-4 rounded-xl bg-amber-50/90 border border-amber-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 cursor-pointer hover:bg-amber-100/80 transition-colors"
+        >
           <div className="flex items-start gap-3">
             <div className="p-2 bg-amber-100 text-amber-700 rounded-lg shrink-0 mt-0.5 sm:mt-0">
               <ShieldAlert className="w-5 h-5 animate-pulse" />
@@ -170,7 +176,7 @@ export default function HealthNewsWidget() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-200 text-amber-900 rounded">
-                  Peringatan Kesehatan
+                  Peringatan Kesehatan Internet
                 </span>
                 <span className="text-xs font-semibold text-amber-800">{urgentAlert.source}</span>
               </div>
@@ -182,13 +188,16 @@ export default function HealthNewsWidget() {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => setSelectedArticle(urgentAlert)}
-            className="shrink-0 flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors shadow-sm"
+          <a
+            href={urgentAlert.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors shadow-sm"
           >
-            <span>Lihat Detail</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
+            <span>Buka Berita Asli</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
         </div>
       )}
 
@@ -213,10 +222,12 @@ export default function HealthNewsWidget() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {articles.map((item) => (
-            <div
+            <a
               key={item.id}
-              onClick={() => setSelectedArticle(item)}
-              className="group cursor-pointer bg-white rounded-xl border border-slate-200/90 overflow-hidden flex flex-col hover:border-teal-300 hover:shadow-lg hover:shadow-teal-500/5 transition-all duration-200"
+              href={item.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group cursor-pointer bg-white rounded-xl border border-slate-200/90 overflow-hidden flex flex-col hover:border-teal-400 hover:shadow-lg hover:shadow-teal-500/10 transition-all duration-200 relative text-left no-underline"
             >
               {/* Card Image Cover */}
               <div className="relative h-40 w-full overflow-hidden bg-slate-100">
@@ -225,7 +236,6 @@ export default function HealthNewsWidget() {
                   alt={item.title}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   onError={(e) => {
-                    // Fallback graphic if image fails to load
                     (e.target as HTMLElement).style.display = "none";
                   }}
                 />
@@ -243,11 +253,18 @@ export default function HealthNewsWidget() {
                   )}
                 </div>
 
+                {/* External Link Indicator Badge */}
+                <div className="absolute top-2.5 right-2.5 p-1.5 bg-slate-900/80 text-white rounded-lg group-hover:bg-teal-600 transition-colors shadow-sm">
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </div>
+
                 {/* Source Badge */}
-                <div className="absolute bottom-2.5 left-2.5 text-white text-[11px] font-medium flex items-center gap-1">
-                  <span className="font-semibold text-teal-300">{item.source}</span>
-                  <span>•</span>
-                  <span className="opacity-90">{formatDate(item.publishedAt)}</span>
+                <div className="absolute bottom-2.5 left-2.5 right-2.5 text-white text-[11px] font-medium flex items-center justify-between">
+                  <span className="font-semibold text-teal-300 truncate max-w-[160px] flex items-center gap-1">
+                    <Globe className="w-3 h-3 text-teal-300 shrink-0" />
+                    {item.source}
+                  </span>
+                  <span className="opacity-90 shrink-0">{formatDate(item.publishedAt)}</span>
                 </div>
               </div>
 
@@ -275,19 +292,19 @@ export default function HealthNewsWidget() {
                     ))}
                   </div>
 
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
+                    <span className="flex items-center gap-1 text-slate-400">
+                      <Clock className="w-3.5 h-3.5" />
                       {item.readTime}
                     </span>
-                    <span className="text-teal-600 font-semibold group-hover:translate-x-0.5 transition-transform flex items-center gap-1 text-[11px]">
-                      Baca Selengkapnya
-                      <ChevronRight className="w-3.5 h-3.5" />
+                    <span className="text-teal-600 font-bold group-hover:underline flex items-center gap-1 text-[11px]">
+                      <span>Buka Artikel di Portal</span>
+                      <ExternalLink className="w-3 h-3" />
                     </span>
                   </div>
                 </div>
               </div>
-            </div>
+            </a>
           ))}
         </div>
       )}
@@ -295,123 +312,8 @@ export default function HealthNewsWidget() {
       {/* Last Updated Timestamp Footer */}
       {lastRefreshed && (
         <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-          <span>Terakhir diperbarui: {lastRefreshed}</span>
-          <span>Menampilkan {articles.length} berita kesehatan terkini</span>
-        </div>
-      )}
-
-      {/* Reader Modal / Drawer */}
-      {selectedArticle && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 overflow-hidden my-auto">
-            {/* Modal Header Cover */}
-            <div className="relative h-48 sm:h-56 w-full bg-slate-900 shrink-0">
-              <img
-                src={selectedArticle.imageUrl}
-                alt={selectedArticle.title}
-                className="w-full h-full object-cover opacity-80"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
-              
-              {/* Close Button */}
-              <button
-                onClick={() => setSelectedArticle(null)}
-                className="absolute top-3 right-3 p-2 bg-slate-900/80 hover:bg-slate-900 text-white rounded-full transition-colors border border-white/20"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              {/* Title Overlay */}
-              <div className="absolute bottom-4 left-4 right-4 text-white">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="px-2.5 py-0.5 text-xs font-bold bg-teal-500 text-white rounded-md">
-                    {selectedArticle.categoryLabel}
-                  </span>
-                  <span className="text-xs text-slate-300 font-medium">
-                    {selectedArticle.source}
-                  </span>
-                </div>
-                <h3 className="text-base sm:text-lg font-bold line-clamp-2 text-white">
-                  {selectedArticle.title}
-                </h3>
-              </div>
-            </div>
-
-            {/* Modal Body Scrollable */}
-            <div className="p-6 overflow-y-auto space-y-5 flex-1 text-slate-800">
-              {/* Metadata */}
-              <div className="flex items-center justify-between text-xs text-slate-500 pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <UserCheck className="w-4 h-4 text-teal-600" />
-                  <span>Penulis: <strong>{selectedArticle.author}</strong></span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span>{formatDate(selectedArticle.publishedAt)}</span>
-                  <span>•</span>
-                  <span>{selectedArticle.readTime}</span>
-                </div>
-              </div>
-
-              {/* Main Content */}
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-teal-700 mb-2">Ringkasan Berita</h4>
-                <p className="text-sm text-slate-700 leading-relaxed font-normal">
-                  {selectedArticle.content}
-                </p>
-              </div>
-
-              {/* Key Takeaways for Medical Staff */}
-              {selectedArticle.keyTakeaways && selectedArticle.keyTakeaways.length > 0 && (
-                <div className="bg-teal-50/70 border border-teal-200/80 rounded-xl p-4">
-                  <div className="flex items-center gap-2 text-teal-900 font-bold text-xs mb-2">
-                    <Sparkles className="w-4 h-4 text-teal-600" />
-                    <span>Poin Penting Bagi Tenaga Klinis & Klinik</span>
-                  </div>
-                  <ul className="space-y-1.5 text-xs text-teal-950">
-                    {selectedArticle.keyTakeaways.map((point, i) => (
-                      <li key={i} className="flex items-start gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-teal-600 mt-1.5 shrink-0" />
-                        <span>{point}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Disease Tags */}
-              <div className="flex flex-wrap gap-1.5 pt-2">
-                {selectedArticle.diseaseTags.map((tag, i) => (
-                  <span key={i} className="px-2.5 py-1 text-xs font-semibold bg-slate-100 text-slate-700 rounded-lg">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Modal Footer with External Portal Link */}
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3 shrink-0">
-              <div className="text-xs text-slate-500">
-                Sumber asli: <strong className="text-slate-700">{selectedArticle.source}</strong>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setSelectedArticle(null)}
-                  className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-200 rounded-xl transition-colors"
-                >
-                  Tutup
-                </button>
-                <a
-                  href={selectedArticle.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl shadow-sm transition-colors"
-                >
-                  <span>Buka Artikel di Portal Asli</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              </div>
-            </div>
-          </div>
+          <span>Terakhir diperbarui dari internet: {lastRefreshed}</span>
+          <span>Menampilkan {articles.length} berita kesehatan live dari internet</span>
         </div>
       )}
     </div>

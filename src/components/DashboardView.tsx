@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import HealthNewsWidget from "./HealthNewsWidget";
 import { 
   Users, Calendar as CalendarIcon, Clock, Wallet, ChevronLeft, ChevronRight, 
   Sparkles, ShieldCheck, ArrowRight, Eye, CheckCircle2, Shield, Lock, Activity, FileText,
@@ -1529,6 +1530,9 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
         </div>
 
       </div>
+
+      {/* ================= PORTAL BERITA KESEHATAN & PENYAKIT TERKINI ================= */}
+      <HealthNewsWidget />
 
       {/* ================= ROW 4: BANNER KEAMANAN & KEPATUHAN (FOOTER) ================= */}
       <div style={{ background: "linear-gradient(135deg, #e6fffa 0%, #ccfbf1 100%)", borderRadius: 20, border: "1px solid #99f6e4", padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16, boxShadow: "0 2px 10px rgba(13,148,136,0.05)" }}>

@@ -19,18 +19,48 @@ const PRESET_PROMPTS = [
 
 
 
+const INITIAL_WELCOME_MESSAGE: Message = {
+  sender: "ai",
+  text: "Halo! Saya Asisten AI Klinis Klinik Sehat Sentosa. Saya siap membantu Anda memberikan rekomendasi kesehatan, menganalisis gejala, menjelaskan aturan pakai obat, atau membantu mengoptimalkan alur operasional klinik Anda. Silakan ketik pertanyaan Anda atau pilih tombol cepat di bawah ini!",
+  time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+};
+
 export default function AiAssistantView() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      sender: "ai",
-      text: "Halo! Saya Asisten AI Klinis Klinik Sehat Sentosa. Saya siap membantu Anda memberikan rekomendasi kesehatan, menganalisis gejala, menjelaskan aturan pakai obat, atau membantu mengoptimalkan alur operasional klinik Anda. Silakan ketik pertanyaan Anda atau pilih tombol cepat di bawah ini!",
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("clinic_ai_chat_history_v1");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {}
     }
-  ]);
+    return [INITIAL_WELCOME_MESSAGE];
+  });
   const [inputText, setInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Simpan riwayat chat ke localStorage secara otomatis setiap terjadi perubahan pesan
+  useEffect(() => {
+    if (typeof window !== "undefined" && messages.length > 0) {
+      try {
+        localStorage.setItem("clinic_ai_chat_history_v1", JSON.stringify(messages));
+      } catch (e) {}
+    }
+  }, [messages]);
+
+  const handleClearHistory = () => {
+    if (confirm("Apakah Anda yakin ingin menghapus seluruh riwayat percakapan AI ini?")) {
+      const reset = [INITIAL_WELCOME_MESSAGE];
+      setMessages(reset);
+      try {
+        localStorage.setItem("clinic_ai_chat_history_v1", JSON.stringify(reset));
+      } catch (e) {}
+    }
+  };
 
   useEffect(() => {
     const envKey = process.env.NEXT_PUBLIC_GROQ_API_KEY;
@@ -338,14 +368,47 @@ export default function AiAssistantView() {
           overflow: "hidden"
         }}>
           {/* Chat Header */}
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#f3e8ff", display: "flex", alignItems: "center", justifyContent: "center", color: "#a855f7" }}>
-              <Bot style={{ width: 20, height: 20 }} />
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#f3e8ff", display: "flex", alignItems: "center", justifyContent: "center", color: "#a855f7" }}>
+                <Bot style={{ width: 20, height: 20 }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: "#0f172a" }}>Asisten AI Serbaguna</div>
+                <div style={{ fontSize: 11, color: "#64748b" }}>Pengetahuan Umum, Sains, Medis & Operasional Klinik</div>
+              </div>
             </div>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: "#0f172a" }}>Asisten AI Serbaguna</div>
-              <div style={{ fontSize: 11, color: "#64748b" }}>Pengetahuan Umum, Sains, Medis & Operasional Klinik</div>
-            </div>
+            <button
+              type="button"
+              onClick={handleClearHistory}
+              title="Bersihkan Riwayat Chat AI"
+              style={{
+                padding: "6px 12px",
+                borderRadius: 10,
+                border: "1px solid #e2e8f0",
+                background: "#f8fafc",
+                color: "#64748b",
+                fontSize: 11.5,
+                fontWeight: 700,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                transition: "all 0.2s"
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "#f43f5e";
+                e.currentTarget.style.color = "#f43f5e";
+                e.currentTarget.style.background = "#fff1f2";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "#e2e8f0";
+                e.currentTarget.style.color = "#64748b";
+                e.currentTarget.style.background = "#f8fafc";
+              }}
+            >
+              🗑️ Hapus Riwayat
+            </button>
           </div>
 
           {/* Chat Message History */}

@@ -48,9 +48,7 @@ export default function MainPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("Dashboard");
   const [showDocMenu, setShowDocMenu] = useState(false);
-  const [showBranchMenu, setShowBranchMenu] = useState(false);
   const [showDoctorModal, setShowDoctorModal] = useState(false);
-  const [selectedBranch, setSelectedBranch] = useState("Klinik Sehat Sentosa - Cabang Semarang");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [prefilledPatientForAppt, setPrefilledPatientForAppt] = useState<{ rm: string; name: string; phone: string } | null>(null);
   const [prefilledPatientForEncounter, setPrefilledPatientForEncounter] = useState<null | { rm: string; name: string; insurance?: string }>(null);
@@ -96,13 +94,6 @@ export default function MainPage() {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3000);
   };
-
-  const branches = [
-    "Klinik Sehat Sentosa - Cabang Semarang (Utama)",
-    "Klinik Sehat Sentosa - Cabang Jakarta Selatan",
-    "Klinik Sehat Sentosa - Cabang Surabaya Pusat",
-    "Klinik Sehat Sentosa - Cabang Bandung Kota"
-  ];
 
   const handleStartEncounter = (patient: { rm: string; name: string; insurance?: string }) => {
     setActiveTab("Encounter");
@@ -246,41 +237,15 @@ export default function MainPage() {
               <Menu style={{ width:18, height:18, color:"#64748b" }} />
             </button>
             
-            <div style={{ position: "relative" }}>
-              <button 
-                onClick={() => setShowBranchMenu(!showBranchMenu)}
-                style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 16px", borderRadius:16, border:"1px solid #f3e8e2", background:"#fff", cursor: "pointer" }}>
-                <div style={{ width:24, height:24, borderRadius:8, background:"#eff6ff", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                  <Building2 style={{ width:14, height:14, color:"#3b82f6" }} />
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", borderRadius: 16, border: "1px solid #f3e8e2", background: "#fff" }}>
+                <div style={{ width: 24, height: 24, borderRadius: 8, background: "#eff6ff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Building2 style={{ width: 14, height: 14, color: "#3b82f6" }} />
                 </div>
-                <span style={{ fontSize:12.5, fontWeight:750, color:"#0f172a" }}>
-                  {selectedBranch}
+                <span style={{ fontSize: 12.5, fontWeight: 750, color: "#0f172a" }}>
+                  Klinik Sehat Sentosa
                 </span>
-                <ChevronDown style={{ width:14, height:14, color:"#94a3b8" }} />
-              </button>
-
-              {showBranchMenu && (
-                <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, width: 310, background: "#fff", border: "1px solid #f3e8e2", borderRadius: 16, boxShadow: "0 10px 25px rgba(0,0,0,0.12)", padding: 8, zIndex: 100 }}>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: "#94a3b8", padding: "6px 12px", textTransform: "uppercase" }}>Pilih Cabang Klinik</div>
-                  {branches.map(b => (
-                    <button 
-                      key={b}
-                      onClick={() => {
-                        setSelectedBranch(b.replace(" (Utama)", ""));
-                        setShowBranchMenu(false);
-                        showToast(`Berhasil berpindah ke ${b}`);
-                      }}
-                      style={{
-                        width: "100%", textAlign: "left", padding: "9px 12px", borderRadius: 10, border: "none",
-                        background: selectedBranch === b.replace(" (Utama)", "") ? "#e0f2fe" : "none",
-                        color: selectedBranch === b.replace(" (Utama)", "") ? "#0369a1" : "#334155",
-                        fontSize: 12, fontWeight: 700, cursor: "pointer"
-                      }}>
-                      🏥 {b}
-                    </button>
-                  ))}
-                </div>
-              )}
+              </div>
             </div>
           </div>
 

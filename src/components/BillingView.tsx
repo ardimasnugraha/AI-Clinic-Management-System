@@ -261,7 +261,7 @@ export default function BillingView() {
         <body>
           <div class="header">
             <h1 class="clinic-title">Klinik Sehat Sentosa</h1>
-            <p class="clinic-subtitle">Cabang Semarang • Telp: (024) 8899-77</p>
+            <p class="clinic-subtitle">Telp: (024) 8899-77</p>
           </div>
           
           <div style="text-align: center; margin-bottom: 15px;">

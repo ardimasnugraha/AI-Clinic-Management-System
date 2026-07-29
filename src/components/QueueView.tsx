@@ -811,7 +811,7 @@ export default function QueueView() {
             {/* Header Ticket */}
             <div style={{ borderBottom: "2px stroke #0f172a", paddingBottom: 12, marginBottom: 16 }}>
               <h3 style={{ fontSize: 14, fontWeight: 900, color: "#0f172a", margin: 0 }}>Klinik Sehat Sentosa</h3>
-              <p style={{ fontSize: 10, color: "#64748b", margin: "2px 0 0" }}>Cabang Semarang • Telepon: (024) 8899-77</p>
+              <p style={{ fontSize: 10, color: "#64748b", margin: "2px 0 0" }}>Telepon: (024) 8899-77</p>
             </div>
 
             <p style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", margin: "0 0 4px" }}>

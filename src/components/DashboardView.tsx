@@ -1334,12 +1334,11 @@ export default function DashboardView({ onNavigateTab }: DashboardViewProps) {
           </div>
         </div>
 
-        {/* Widget 2: AI Clinical Assistant Beta */}
+        {/* Widget 2: AI Clinical Assistant */}
         <div style={{ background: "linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)", borderRadius: 20, border: "1px solid #e9d5ff", padding: 20, boxShadow: "0 2px 10px rgba(139,92,246,0.05)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <Sparkles style={{ width: 18, height: 18, color: "#8b5cf6" }} />
             <h3 style={{ fontSize: 15, fontWeight: 800, color: "#581c87", margin: 0 }}>AI Clinical Assistant</h3>
-            <span style={{ background: "#c084fc", color: "#fff", padding: "2px 8px", borderRadius: 10, fontSize: 9.5, fontWeight: 800 }}>Beta</span>
           </div>
 
           <p style={{ fontSize: 11.5, color: "#6b21a8", lineHeight: 1.4, marginBottom: 14 }}>
